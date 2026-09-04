@@ -1,0 +1,21 @@
+# LibreLane standalone checkpoint config for the TinyTapeout user macro.
+DESIGN_NAME: tt_um_tiny_dram_pim
+VERILOG_FILES:
+  - dir::src/pim_pkg.sv
+  - dir::src/command_decoder.sv
+  - dir::src/spi_frontend.sv
+  - dir::src/pim_channel.sv
+  - dir::src/tt_um_tiny_dram_pim.sv
+USE_SLANG: true
+CLOCK_PORT: clk
+CLOCK_PERIOD: 100
+
+# Conservative one-tile IHP26b-sized macro estimate (to be updated).
+FP_CORE_UTIL: 45
+PDN_VOFFSET: 5
+PDN_HOFFSET: 5
+PDN_VWIDTH: 2
+PDN_HWIDTH: 2
+PDN_VPITCH: 30
+PDN_HPITCH: 30
+PDN_SKIPTRIM: true
