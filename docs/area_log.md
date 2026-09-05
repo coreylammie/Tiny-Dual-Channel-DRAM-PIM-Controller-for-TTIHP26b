@@ -766,3 +766,18 @@ Decision: the area-efficiency refactor reduced official adjusted movable area by
 - Sequential area: 20526.3072
 
 Compared with the prior no-STREAM RTL slimming checkpoint, cutting the secondary PU operations saves 550 mapped cells and 4881.5676 mapped area. This is a meaningful reduction but still roughly 51352.8120 / 28941.494 = 1.77x the official 1x1 core area before placement overhead, so further architectural cuts are likely still required unless the official GDS flow reports an unexpectedly better placement picture.
+
+## 1x1 Target Minimal PU Official GDS Attempt
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Commit: `b0a584b`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 50973.754 um^2
+- GPL movable instances area after pin-density adjustment: 57484.340 um^2
+- GPL utilization: 198.623%
+- Failure: `[GPL-0301] Utilization 198.623 % exceeds 100%.`
+
+Decision: removing the secondary PU operations improves official adjusted movable area by 4842.542 um^2 versus the RTL-slimming checkpoint, but the design is still about 1.99x the legal placement area for a 1x1 tile. Continue cutting architectural support logic while preserving two channels, two banks per channel, and a near-bank PU with a minimal PIM command set.
