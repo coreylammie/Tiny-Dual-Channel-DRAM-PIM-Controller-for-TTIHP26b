@@ -20,7 +20,7 @@ Each channel owns independent refresh state. Channel 0 starts at refresh phase 0
 
 Each channel also owns an 18-bit accumulator and a small atomic-operation busy counter. If a command arrives while the channel PIM datapath is busy, the command is dropped and sticky error is set. `ABORT` clears sticky error, refresh state, and any active PIM operation.
 
-The implemented PIM operations are `VXOR`, `VADD`, `DOT`, and `MAC`, plus accumulator byte reads. `DOT` and `MAC` share a lane-serial accumulator datapath: INT1 uses an 8-bit popcount term, while INT2/INT4/INT8 add one signed lane product per busy cycle. Multi-row dot products are host-driven sequences of `ACT`, `DOT`, and `MAC`; opcode `0x7` and the removed secondary PU subopcodes are reserved in this area-reduced branch.
+The implemented PIM operations are `VXOR`, `VADD`, `DOT`, and `MAC`, plus accumulator byte reads. `VXOR` and `VADD` are immediate row-transform commands. `DOT` and `MAC` share a lane-serial accumulator datapath: INT1 uses an 8-bit popcount term, while INT2/INT4/INT8 add one signed lane product per busy cycle. Multi-row dot products are host-driven sequences of `ACT`, `DOT`, and `MAC`; opcode `0x7` and the removed secondary PU subopcodes are reserved in this area-reduced branch.
 
 ## TinyTapeout Pins
 

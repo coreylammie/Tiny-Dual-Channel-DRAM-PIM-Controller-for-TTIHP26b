@@ -77,14 +77,11 @@ module pim_channel #(
   logic       refresh_overdue;
   logic       sticky_error;
 
-  // PIM operation state. VOPs are delayed writes; DOT/MAC use the accumulator
-  // and lane-serial dot-product state below.
+  // PIM operation state. DOT/MAC use the accumulator and lane-serial
+  // dot-product state below. VOPs update the destination row at decode time.
   logic [ACC_WIDTH-1:0] acc;
   logic [3:0] pim_busy_ctr;
-  logic       active_is_vop;
   logic [1:0] active_precision;
-  logic       active_dest_bank;
-  logic [ROW_WIDTH-1:0] vop_result;
   logic [ROW_WIDTH-1:0] active_operand_a;
   logic [ROW_WIDTH-1:0] active_operand_b;
 
@@ -253,19 +250,6 @@ module pim_channel #(
     end
   endfunction
 
-  function automatic logic [3:0] vop_latency (
-    input logic [1:0] precision
-  );
-    begin
-      unique case (precision)
-        PREC_INT1: vop_latency = 4'd8;
-        PREC_INT2: vop_latency = 4'd4;
-        PREC_INT4: vop_latency = 4'd2;
-        default:   vop_latency = 4'd1;
-      endcase
-    end
-  endfunction
-
   function automatic logic [3:0] dot_latency (
     input logic [1:0] precision
   );
@@ -298,10 +282,7 @@ module pim_channel #(
       sticky_error <= 1'b0;
       acc <= '0;
       pim_busy_ctr <= 4'd0;
-      active_is_vop <= 1'b0;
       active_precision <= PREC_INT1;
-      active_dest_bank <= 1'b0;
-      vop_result <= '0;
       active_operand_a <= '0;
       active_operand_b <= '0;
       dot_lane <= 3'd0;
@@ -338,18 +319,13 @@ module pim_channel #(
           sticky_error <= 1'b1;
         end
         pim_busy_ctr <= pim_busy_ctr - 4'd1;
-        if (!active_is_vop) begin
-          // DOT/MAC accumulates one lane term each cycle. DOT cleared acc when
-          // it started; MAC leaves the prior accumulator value intact.
-          acc <= acc + dot_lane_term(active_precision, active_operand_a, active_operand_b, dot_lane);
-          if (last_dot_lane || (pim_busy_ctr == 4'd1)) begin
-            dot_lane <= 3'd0;
-          end else begin
-            dot_lane <= dot_lane + 3'd1;
-          end
-        end
-        if ((pim_busy_ctr == 4'd1) && active_is_vop) begin
-          rows[active_dest_bank][active_row[active_dest_bank]] <= vop_result;
+        // DOT/MAC accumulates one lane term each cycle. DOT cleared acc when
+        // it started; MAC leaves the prior accumulator value intact.
+        acc <= acc + dot_lane_term(active_precision, active_operand_a, active_operand_b, dot_lane);
+        if (last_dot_lane || (pim_busy_ctr == 4'd1)) begin
+          dot_lane <= 3'd0;
+        end else begin
+          dot_lane <= dot_lane + 3'd1;
         end
       end else if (exec_cmd_valid) begin
         unique case (exec_uop.op)
@@ -410,14 +386,13 @@ module pim_channel #(
             end else if ((exec_uop.subop == VOP_ADD) && (exec_uop.precision == PREC_INT1)) begin
               sticky_error <= 1'b1;
             end else begin
-              active_is_vop <= 1'b1;
-              active_precision <= exec_uop.precision;
-              active_dest_bank <= exec_uop.dest_bank;
               unique case (exec_uop.subop)
-                VOP_XOR: vop_result <= operand_a ^ operand_b;
-                default: vop_result <= lane_add_wrap(operand_a, operand_b, exec_uop.precision);
+                VOP_XOR: begin
+                  rows[exec_uop.dest_bank][active_row[exec_uop.dest_bank]] <= operand_a ^ operand_b;
+                end
+                default: rows[exec_uop.dest_bank][active_row[exec_uop.dest_bank]] <=
+                  lane_add_wrap(operand_a, operand_b, exec_uop.precision);
               endcase
-              pim_busy_ctr <= vop_latency(exec_uop.precision);
             end
           end
           OP_REDUCE: begin
@@ -430,10 +405,7 @@ module pim_channel #(
             ) begin
               sticky_error <= 1'b1;
             end else begin
-              active_is_vop <= 1'b0;
               active_precision <= exec_uop.precision;
-              active_dest_bank <= 1'b0;
-              vop_result <= '0;
               active_operand_a <= operand_a;
               active_operand_b <= operand_b;
               dot_lane <= 3'd0;
@@ -486,7 +458,6 @@ module pim_channel #(
             sticky_error <= 1'b0;
             acc <= '0;
             pim_busy_ctr <= 4'd0;
-            active_is_vop <= 1'b0;
           end
           default: begin
             sticky_error <= 1'b1;
