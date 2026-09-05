@@ -23,7 +23,6 @@ class Channel:
     phase: int
     banks: list[Bank] = field(default_factory=lambda: [Bank(), Bank()])
     refresh_ctr: int = 0
-    refresh_reload: int = REF_INTERVAL - 1
     refresh_enable: bool = True
     refresh_busy_ctr: int = 0
     refresh_bank: int = 0
@@ -38,7 +37,7 @@ class Channel:
     def tick_refresh(self) -> None:
         if self.refresh_enable:
             if self.refresh_ctr == 0:
-                self.refresh_ctr = self.refresh_reload
+                self.refresh_ctr = REF_INTERVAL - 1
                 if self.refresh_busy_ctr or self.refresh_pending:
                     self.refresh_overdue = True
                 else:
@@ -192,14 +191,9 @@ class Channel:
         if cmd.op == Opcode.STATUS:
             return self.status()
         if cmd.op == Opcode.CONFIG:
-            if cmd.subop == 0:
-                self.refresh_reload = cmd.imm8 & 0xFF
-                self.refresh_ctr = self.refresh_reload
-            elif cmd.subop == 1:
-                return self.refresh_reload
-            elif cmd.subop == 2:
+            if cmd.subop == 2:
                 self.refresh_enable = bool(cmd.imm8 & 1)
-                self.refresh_ctr = self.refresh_reload
+                self.refresh_ctr = REF_INTERVAL - 1
                 if not self.refresh_enable:
                     self.refresh_pending = False
                     self.refresh_overdue = False

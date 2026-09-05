@@ -181,16 +181,12 @@ async def spi_reduce_mac_accumulates_dot(dut):
 
 
 @cocotb.test()
-async def spi_config_refresh_reload_sets_overdue(dut):
+async def spi_config_auto_refresh_enable_and_reserved_reload(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset(dut)
     spi = SpiDriver(dut)
 
     await spi.transfer32(isa.abort(0).encode())
-    await spi.transfer32(isa.config_refresh(0, 2).encode())
-    await spi.transfer32(isa.config_read_refresh(0).encode())
-    reload_rsp = await spi.transfer32(isa.nop().encode())
-
     await spi.transfer32(isa.config_auto_refresh(0, False).encode())
     await wait_core_clocks(dut, 12)
     await spi.transfer32(isa.status(0).encode())
@@ -200,17 +196,16 @@ async def spi_config_refresh_reload_sets_overdue(dut):
     await spi.transfer32(isa.config_read_auto_refresh(0).encode())
     enable_rsp = await spi.transfer32(isa.nop().encode())
 
-    await spi.transfer32(isa.config_refresh(0, 1).encode())
-    await wait_core_clocks(dut, 12)
-    await spi.transfer32(isa.status(0).encode())
-    rsp = await spi.transfer32(isa.nop().encode())
+    await spi.transfer32(isa.Command(isa.Opcode.CONFIG, ch=0, subop=0, imm8=2).encode())
+    reload_write_rsp = await status_response(spi, 0)
+    await spi.transfer32(isa.abort(0).encode())
+    await spi.transfer32(isa.Command(isa.Opcode.CONFIG, ch=0, subop=1).encode())
+    reload_read_rsp = await status_response(spi, 0)
 
-    assert (reload_rsp >> 24) == 0xA0
-    assert (reload_rsp & 0xFF) == 2
     assert ((disabled_rsp >> 16) & 0x40) == 0
     assert (enable_rsp & 0xFF) == 1
-    assert (rsp >> 24) == 0xA0
-    assert ((rsp >> 16) & 0x40) != 0
+    assert ((reload_write_rsp >> 16) & 0x80) != 0
+    assert ((reload_read_rsp >> 16) & 0x80) != 0
 
 
 @cocotb.test()

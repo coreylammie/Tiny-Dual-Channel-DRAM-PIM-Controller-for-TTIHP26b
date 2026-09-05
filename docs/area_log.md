@@ -781,3 +781,22 @@ Compared with the prior no-STREAM RTL slimming checkpoint, cutting the secondary
 - Failure: `[GPL-0301] Utilization 198.623 % exceeds 100%.`
 
 Decision: removing the secondary PU operations improves official adjusted movable area by 4842.542 um^2 versus the RTL-slimming checkpoint, but the design is still about 1.99x the legal placement area for a 1x1 tile. Continue cutting architectural support logic while preserving two channels, two banks per channel, and a near-bank PU with a minimal PIM command set.
+
+## 1x1 Target Fixed Refresh Timing
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Feature change: removed programmable refresh reload write/read state; automatic refresh now uses a fixed 255-core-clock interval while preserving auto-refresh enable read/write and forced `REF`
+- Preserved geometry: 2 channels x 2 banks/channel x 2 rows/bank x 8 bits/row
+- Preserved PIM operations: `VXOR`, `VADD`, `DOT`, `MAC`, and accumulator byte reads
+- Local model/example tests: 23 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 11 pass, 0 fail
+- Run tag: `1x1-2rows-fixed-refresh-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 3488
+- Sequential cells: 403 `sg13g2_dfrbpq_1`
+- Total mapped area: 49655.8944
+- Sequential area: 19742.4864
+
+Compared with the minimal-PU checkpoint, fixing refresh timing saves 89 mapped cells, 16 sequential cells, and 1696.9176 mapped area. The remaining gap is still large, so command queueing or compute precision width are now the likely next cuts if official GDS remains well over 100%.

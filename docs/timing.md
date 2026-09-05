@@ -12,7 +12,7 @@ The Stage 2 baseline uses scaled architectural timing in the main TinyTapeout `c
 | RD | 1 core clock after decode, response available on next SPI frame |
 | REF forced start | 1 core clock after decode |
 | REF busy time | 4 core clocks |
-| Automatic refresh interval | Configurable per channel and optionally disabled; reset default is enabled at 255 core clocks |
+| Automatic refresh interval | Fixed 255 core clocks per channel; optionally disabled through `CONFIG` |
 
 ## Lane-Serial DOT/MAC Accumulator Checkpoint
 
@@ -39,8 +39,6 @@ The current RTL starts each PIM operation as an atomic channel operation. Refres
 
 Multi-row dot products are host-driven sequences of `ACT`, `DOT`, and `MAC`; there is no autonomous row-walk command in the reduced `1x1` target branch.
 
-## Configurable Refresh
+## Refresh Control
 
-`CONFIG subopcode 0` writes the selected channel's refresh reload counter from `imm8`; `CONFIG subopcode 1` reads it back. The effective interval is `imm8 + 1` core clocks because a counter value of zero starts the refresh sequence and reloads from the configured value.
-
-`CONFIG subopcode 2` sets automatic refresh enable from `imm8[0]`; `CONFIG subopcode 3` reads the enable bit back. Disabling automatic refresh stops the autonomous counter from creating pending refresh work and clears pending/overdue refresh state. Forced `REF` commands still run. Reset initializes the reload value to 254 and enables automatic refresh, so the default automatic refresh interval remains 255 core clocks. `ABORT` clears pending/busy/overdue refresh state but leaves the configured reload and enable values unchanged.
+`CONFIG subopcode 2` sets automatic refresh enable from `imm8[0]`; `CONFIG subopcode 3` reads the enable bit back. Disabling automatic refresh stops the autonomous counter from creating pending refresh work and clears pending/overdue refresh state. Forced `REF` commands still run. Reset enables automatic refresh with a fixed 255-core-clock interval. `ABORT` clears pending/busy/overdue refresh state but leaves the enable bit unchanged.

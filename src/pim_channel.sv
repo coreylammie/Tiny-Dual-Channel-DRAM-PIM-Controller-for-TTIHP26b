@@ -62,8 +62,6 @@ module pim_channel #(
     logic [7:0] imm8;
   } pim_uop_t;
 
-  localparam logic [7:0] REF_RELOAD_DEFAULT = REF_INTERVAL[7:0] - 8'd1;
-
   // Minimal row storage: two banks, two addressable rows per bank, 8 bits/row.
   logic [ROW_WIDTH-1:0] rows [BANKS_PER_CH-1:0][ROWS_PER_BANK-1:0];
   logic open [BANKS_PER_CH-1:0];
@@ -72,7 +70,6 @@ module pim_channel #(
   // Automatic refresh state. A zero counter creates a pending refresh; refresh
   // starts when no PIM operation is busy. Forced REF bypasses refresh_enable.
   logic [7:0] refresh_ctr;
-  logic [7:0] refresh_reload;
   logic       refresh_enable;
   logic [2:0] refresh_busy_ctr;
   logic       refresh_bank;
@@ -297,7 +294,6 @@ module pim_channel #(
         end
       end
       refresh_ctr <= REF_PHASE[7:0];
-      refresh_reload <= REF_RELOAD_DEFAULT;
       refresh_enable <= 1'b1;
       refresh_busy_ctr <= 3'd0;
       refresh_bank <= 1'b0;
@@ -323,7 +319,7 @@ module pim_channel #(
       if (refresh_enable) begin
         // Automatic refresh scheduling is decoupled from forced REF commands.
         if (refresh_ctr == 8'd0) begin
-          refresh_ctr <= refresh_reload;
+          refresh_ctr <= REF_INTERVAL[7:0] - 8'd1;
           if (refresh_busy || refresh_pending) begin
             refresh_overdue <= 1'b1;
           end else begin
@@ -481,20 +477,12 @@ module pim_channel #(
             rsp_data <= status;
           end
           OP_CONFIG: begin
-            // CONFIG is intentionally narrow: refresh reload read/write plus
-            // automatic-refresh enable read/write.
+            // CONFIG is intentionally narrow: automatic-refresh enable
+            // write/read only. The refresh interval is fixed for area.
             unique case (exec_uop.subop)
-              3'd0: begin
-                refresh_reload <= exec_uop.imm8;
-                refresh_ctr <= exec_uop.imm8;
-              end
-              3'd1: begin
-                rsp_valid <= 1'b1;
-                rsp_data <= refresh_reload;
-              end
               3'd2: begin
                 refresh_enable <= exec_uop.imm8[0];
-                refresh_ctr <= refresh_reload;
+                refresh_ctr <= REF_INTERVAL[7:0] - 8'd1;
                 if (!exec_uop.imm8[0]) begin
                   refresh_pending <= 1'b0;
                   refresh_overdue <= 1'b0;

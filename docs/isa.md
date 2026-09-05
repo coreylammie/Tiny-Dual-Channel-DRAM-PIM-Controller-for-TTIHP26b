@@ -65,12 +65,11 @@ All `REDUCE` operations require both selected banks to be open and not refreshin
 
 | CONFIG Subopcode | Mnemonic | Response | Behavior |
 |---:|---|---|---|
-| 0 | REF_RELOAD_WR | none | sets automatic refresh reload counter to `imm8` |
-| 1 | REF_RELOAD_RD | reload value | returns automatic refresh reload counter |
 | 2 | REF_AUTO_WR | none | sets automatic refresh enable from `imm8[0]` |
 | 3 | REF_AUTO_RD | bit 0 | returns automatic refresh enable |
+| other | RESERVED | none | sets sticky error |
 
-The effective refresh interval is `reload + 1` core clocks because the counter reloads after reaching zero. Reset uses reload value 254 and automatic refresh enabled, giving the default 255-core-clock automatic refresh interval. `REF_AUTO_WR` disables only automatic refresh scheduling; forced `REF` commands still work. Unsupported `CONFIG` subopcodes set sticky error.
+The automatic refresh interval is fixed at 255 core clocks. Reset enables automatic refresh. `REF_AUTO_WR` disables only automatic refresh scheduling; forced `REF` commands still work. Unsupported `CONFIG` subopcodes set sticky error.
 
 ## Response Word
 

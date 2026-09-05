@@ -16,7 +16,7 @@ SPI slave
 
 Each bank stores two 8-bit rows, an open-row bit, and a two-bit active-row index. There is no duplicated row-buffer storage. `ACT` records the selected row, `WR` and `RD` target the currently active row, and `PRE` closes the bank.
 
-Each channel owns independent refresh state. Channel 0 starts at refresh phase 0 and channel 1 starts at phase 32 to avoid synchronized refresh behavior. `CONFIG` can update/read the selected channel's automatic refresh reload counter and enable/disable autonomous refresh scheduling. Forced `REF` commands remain available when autonomous refresh is disabled.
+Each channel owns independent refresh state. Channel 0 starts at refresh phase 0 and channel 1 starts at phase 32 to avoid synchronized refresh behavior. The automatic refresh period is fixed at 255 core clocks, and `CONFIG` can enable/disable autonomous refresh scheduling and read back that enable bit. Forced `REF` commands remain available when autonomous refresh is disabled.
 
 Each channel also owns an 18-bit accumulator, a small atomic-operation busy counter, and one pending command slot. If a command arrives while the channel PIM datapath is busy, the channel accepts one queued command and reports it through status bit 0. A second command while the slot is occupied sets sticky error. `ABORT` clears the pending slot, sticky error, and refresh state.
 

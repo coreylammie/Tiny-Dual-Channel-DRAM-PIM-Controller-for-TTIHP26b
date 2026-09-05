@@ -103,14 +103,6 @@ def abort(ch: int) -> Command:
     return Command(Opcode.ABORT, ch=ch)
 
 
-def config_refresh(ch: int, reload: int) -> Command:
-    return Command(Opcode.CONFIG, ch=ch, subop=0, imm8=reload)
-
-
-def config_read_refresh(ch: int) -> Command:
-    return Command(Opcode.CONFIG, ch=ch, subop=1)
-
-
 def config_auto_refresh(ch: int, enable: bool) -> Command:
     return Command(Opcode.CONFIG, ch=ch, subop=2, imm8=int(enable))
 
