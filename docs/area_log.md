@@ -698,3 +698,18 @@ Decision: layout tuning is not enough for the current reduced-depth RTL. To fit 
 - Sequential area: 21016.1952
 
 Compared with the prior 2-row branch checkpoint, removing autonomous row-walk control saves 713 mapped cells and 8528.0958 mapped area. The synthesis area is still about 1.96x the official 28941.494 um^2 1x1 core area before placement overhead, so the next hard check is the official TinyTapeout GDS flow on this branch.
+
+## 1x1 Target Without Autonomous Row-Walk Official GDS Attempt
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Commit: `245d3bc`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 56400.624 um^2
+- GPL movable instances area after pin-density adjustment: 64113.250 um^2
+- GPL utilization: 221.527%
+- Failure: `[GPL-0301] Utilization 221.527 % exceeds 100%.`
+
+Decision: removing autonomous row-walk control helps materially but is not enough for a 1x1 coupon while preserving two channels and two banks per channel. The next experiment needs another functional simplification, with the largest remaining candidates being secondary vector/reduction operations, command queueing, configurable refresh state, or the width/precision of the accumulator datapath.
