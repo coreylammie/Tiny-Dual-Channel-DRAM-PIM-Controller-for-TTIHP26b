@@ -63,7 +63,7 @@ Current verification checkpoint:
 - Opcode `0x7` is reserved and sets sticky error
 - Model/example tests: 24 passing
 - Cocotb SPI RTL tests: 11 TinyTapeout-wrapper tests passing
-- Synthesis: 4102 cells, total mapped area 56587.9608, lint-clean
+- Synthesis: 4127 cells, total mapped area 56234.3796, lint-clean
 - Official TinyTapeout area target: `1x1` tile for the reduced-depth feature set
 - Local KLayout/Magic DRC: not yet rerun for this no-STREAM branch
 - Routed standard-cell utilization: not yet measured for this no-STREAM branch

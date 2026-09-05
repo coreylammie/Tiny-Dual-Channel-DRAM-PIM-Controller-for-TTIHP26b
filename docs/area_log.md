@@ -713,3 +713,22 @@ Compared with the prior 2-row branch checkpoint, removing autonomous row-walk co
 - Failure: `[GPL-0301] Utilization 221.527 % exceeds 100%.`
 
 Decision: removing autonomous row-walk control helps materially but is not enough for a 1x1 coupon while preserving two channels and two banks per channel. The next experiment needs another functional simplification, with the largest remaining candidates being secondary vector/reduction operations, command queueing, configurable refresh state, or the width/precision of the accumulator datapath.
+
+## 1x1 Target RTL Slimming
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Feature change: preserved the no-STREAM ISA but narrowed internal queued command state, reduced the PIM busy counter from 8 bits to 4 bits, and replaced the retained active opcode with a one-bit VOP/REDUCE state
+- Local model/example tests: 24 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 11 pass, 0 fail
+- Run tag: `1x1-2rows-no-stream-rtl-slim-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 4127
+- Sequential cells: 419 `sg13g2_dfrbpq_1`
+- Total mapped area: 56234.3796
+- Sequential area: 20526.3072
+
+Compared with the no-STREAM baseline, this saves 353.5812 mapped area and 10 sequential cells, but increases total cell count by 25 due to changed combinational mapping. A more aggressive same-ISA experiment that made VOP write back immediately was rejected because it worsened mapped area to 56977.7544 despite reducing sequential cells.
+
+Decision: straightforward RTL cleanup is not enough to make 1x1 viable. The remaining gap is still roughly 56234.3796 / 28941.494 = 1.94x before placement overhead, so the next useful experiments need architectural simplification rather than placement-only tuning or small coding-style changes.

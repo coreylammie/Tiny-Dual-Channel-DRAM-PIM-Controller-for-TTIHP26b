@@ -59,14 +59,12 @@ module pim_channel #(
 
   typedef struct packed {
     logic [3:0] op;
-    logic       ch;
     logic [2:0] subop;
     logic [1:0] precision;
     logic       bank_a;
     logic       bank_b;
     logic [1:0] row_a;
-    logic [1:0] row_b;
-    logic [2:0] flags;
+    logic       dest_bank;
     logic [7:0] imm8;
   } pim_uop_t;
 
@@ -91,8 +89,8 @@ module pim_channel #(
   // PIM operation state. VOPs are delayed writes; DOT/MAC use the accumulator
   // and lane-serial dot-product state below.
   logic [ACC_WIDTH-1:0] acc;
-  logic [7:0] pim_busy_ctr;
-  logic [3:0] active_op;
+  logic [3:0] pim_busy_ctr;
+  logic       active_is_vop;
   logic [1:0] active_precision;
   logic       active_dest_bank;
   logic [ROW_WIDTH-1:0] vop_result;
@@ -121,20 +119,18 @@ module pim_channel #(
   logic last_dot_lane;
 
   assign refresh_busy = (refresh_busy_ctr != 3'd0);
-  assign pim_busy = (pim_busy_ctr != 8'd0);
+  assign pim_busy = (pim_busy_ctr != 4'd0);
   assign exec_cmd_valid = pending_valid || cmd_valid;
   assign exec_uop = pending_valid ? pending_uop : incoming_uop;
 
   always_comb begin
     incoming_uop.op = uop_op;
-    incoming_uop.ch = uop_ch;
     incoming_uop.subop = uop_subop;
     incoming_uop.precision = uop_precision;
     incoming_uop.bank_a = uop_bank_a;
     incoming_uop.bank_b = uop_bank_b;
     incoming_uop.row_a = uop_row_a;
-    incoming_uop.row_b = uop_row_b;
-    incoming_uop.flags = uop_flags;
+    incoming_uop.dest_bank = uop_flags[0];
     incoming_uop.imm8 = uop_imm8;
   end
   assign target_open = open[exec_uop.bank_a];
@@ -152,10 +148,10 @@ module pim_channel #(
   // consumed so lint warnings do not hide real unused signals.
   wire _unused_stage2_uop = &{
     1'b0,
-    exec_uop.ch,
     exec_uop.subop[2],
-    exec_uop.row_b,
-    exec_uop.flags[2:1]
+    uop_ch,
+    uop_row_b,
+    uop_flags[2:1]
   };
 
   // Status bits match README.md/docs/isa.md bit order.
@@ -352,34 +348,29 @@ module pim_channel #(
     end
   endfunction
 
-  function automatic logic [3:0] op_latency (
-    input logic [3:0] op,
+  function automatic logic [3:0] vop_latency (
     input logic [1:0] precision
   );
     begin
-      if (op == OP_VOP) begin
-        unique case (precision)
-          PREC_INT1: op_latency = 4'd8;
-          PREC_INT2: op_latency = 4'd4;
-          PREC_INT4: op_latency = 4'd2;
-          default:   op_latency = 4'd1;
-        endcase
-      end else begin
-        op_latency = 4'd15;
-      end
+      unique case (precision)
+        PREC_INT1: vop_latency = 4'd8;
+        PREC_INT2: vop_latency = 4'd4;
+        PREC_INT4: vop_latency = 4'd2;
+        default:   vop_latency = 4'd1;
+      endcase
     end
   endfunction
 
-  function automatic logic [7:0] dot_latency (
+  function automatic logic [3:0] dot_latency (
     input logic [1:0] precision
   );
     begin
       // Lane-serial compromise: one cycle for INT1/INT8, two cycles for INT4,
       // and four cycles for INT2.
       unique case (precision)
-        PREC_INT2: dot_latency = 8'd4;
-        PREC_INT4: dot_latency = 8'd2;
-        default:   dot_latency = 8'd1;
+        PREC_INT2: dot_latency = 4'd4;
+        PREC_INT4: dot_latency = 4'd2;
+        default:   dot_latency = 4'd1;
       endcase
     end
   endfunction
@@ -402,8 +393,8 @@ module pim_channel #(
       refresh_overdue <= 1'b0;
       sticky_error <= 1'b0;
       acc <= '0;
-      pim_busy_ctr <= 8'd0;
-      active_op <= OP_NOP;
+      pim_busy_ctr <= 4'd0;
+      active_is_vop <= 1'b0;
       active_precision <= PREC_INT1;
       active_dest_bank <= 1'b0;
       vop_result <= '0;
@@ -449,30 +440,19 @@ module pim_channel #(
             pending_valid <= 1'b1;
           end
         end
-        pim_busy_ctr <= pim_busy_ctr - 8'd1;
-        if (active_op == OP_REDUCE) begin
+        pim_busy_ctr <= pim_busy_ctr - 4'd1;
+        if (!active_is_vop) begin
           // DOT/MAC accumulates one lane term each cycle. DOT cleared acc when
           // it started; MAC leaves the prior accumulator value intact.
           acc <= acc + dot_lane_term(active_precision, active_operand_a, active_operand_b, dot_lane);
-          if (last_dot_lane || (pim_busy_ctr == 8'd1)) begin
+          if (last_dot_lane || (pim_busy_ctr == 4'd1)) begin
             dot_lane <= 3'd0;
           end else begin
             dot_lane <= dot_lane + 3'd1;
           end
         end
-        if (pim_busy_ctr == 8'd1) begin
-          // Complete the atomic operation. VOP commits its delayed row write;
-          // REDUCE has already accumulated its final lane term.
-          unique case (active_op)
-            OP_VOP: begin
-              rows[active_dest_bank][active_row[active_dest_bank]] <= vop_result;
-            end
-            OP_REDUCE: begin
-            end
-            default: begin
-              sticky_error <= 1'b1;
-            end
-          endcase
+        if ((pim_busy_ctr == 4'd1) && active_is_vop) begin
+          rows[active_dest_bank][active_row[active_dest_bank]] <= vop_result;
         end
       end else if (exec_cmd_valid) begin
         if (pending_valid) begin
@@ -546,9 +526,9 @@ module pim_channel #(
             ) begin
               sticky_error <= 1'b1;
             end else begin
-              active_op <= OP_VOP;
+              active_is_vop <= 1'b1;
               active_precision <= exec_uop.precision;
-              active_dest_bank <= exec_uop.flags[0];
+              active_dest_bank <= exec_uop.dest_bank;
               unique case (exec_uop.subop)
                 VOP_XOR: vop_result <= operand_a ^ operand_b;
                 VOP_AND: vop_result <= operand_a & operand_b;
@@ -556,7 +536,7 @@ module pim_channel #(
                 VOP_ADD: vop_result <= lane_add_wrap(operand_a, operand_b, exec_uop.precision);
                 default: vop_result <= lane_sub_wrap(operand_a, operand_b, exec_uop.precision);
               endcase
-              pim_busy_ctr <= {4'd0, op_latency(exec_uop.op, exec_uop.precision)};
+              pim_busy_ctr <= vop_latency(exec_uop.precision);
             end
           end
           OP_REDUCE: begin
@@ -584,7 +564,7 @@ module pim_channel #(
             end else if (exec_uop.subop == REDUCE_XNORDOT) begin
               acc <= xnordot8(operand_a, operand_b);
             end else begin
-              active_op <= OP_REDUCE;
+              active_is_vop <= 1'b0;
               active_precision <= exec_uop.precision;
               active_dest_bank <= 1'b0;
               vop_result <= '0;
@@ -647,8 +627,8 @@ module pim_channel #(
             refresh_overdue <= 1'b0;
             sticky_error <= 1'b0;
             acc <= '0;
-            pim_busy_ctr <= 8'd0;
-            active_op <= OP_NOP;
+            pim_busy_ctr <= 4'd0;
+            active_is_vop <= 1'b0;
             pending_valid <= 1'b0;
           end
           default: begin

@@ -16,7 +16,7 @@ This file is the short public-facing status snapshot. The detailed historical ar
 
 - Python model/example tests: 24 pass, 0 fail
 - Cocotb TinyTapeout-wrapper RTL tests from `test/`: 11 pass, 0 fail
-- Latest local synthesis checkpoint: 4102 cells, total mapped area 56587.9608, lint-clean
+- Latest local synthesis checkpoint: 4127 cells, total mapped area 56234.3796, lint-clean
 - Latest official TinyTapeout `1x1` GDS check: failed global placement at 221.527% utilization after removing autonomous row-walk control
 - Latest local route/DRC checkpoint: not yet run for this no-STREAM branch
 - Routed standard-cell utilization: not yet measured for this no-STREAM branch
