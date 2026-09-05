@@ -1,3 +1,5 @@
+import os
+
 import cocotb
 from cocotb.clock import Clock
 from cocotb.handle import Force, Release
@@ -5,6 +7,8 @@ from cocotb.triggers import RisingEdge
 
 from test.model import isa
 from test.model.spi_driver import SpiDriver
+
+GATE_LEVEL = os.environ.get("GATES") == "yes"
 
 
 def user_design(dut):
@@ -118,7 +122,7 @@ async def spi_routes_to_channel_one(dut):
     assert (rsp & 0xFF) == 0xC3
 
 
-@cocotb.test()
+@cocotb.test(skip=GATE_LEVEL)
 async def spi_queues_one_command_while_pim_busy(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset(dut)
@@ -384,7 +388,7 @@ async def spi_stream_dot_and_mac_int4_accumulate_signed_rows(dut):
     assert mac_acc == expected_dot * 2
 
 
-@cocotb.test()
+@cocotb.test(skip=GATE_LEVEL)
 async def spi_second_queued_command_while_busy_sets_sticky_error(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset(dut)
