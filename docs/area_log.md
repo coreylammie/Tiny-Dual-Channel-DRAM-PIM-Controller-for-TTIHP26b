@@ -849,3 +849,21 @@ Compared with the fixed-refresh checkpoint, removing command queueing saves 400 
 - Failure: `[GPL-0301] Utilization 169.087 % exceeds 100%.`
 
 Decision: removing command queueing improved official adjusted movable area by 5613.994 um^2 versus the fixed-refresh checkpoint. The design remains 1.69x the legal placement area, so fitting 1x1 now likely requires simplifying the variable-precision compute datapath itself.
+
+## Rejected 1x1 Shared-Lane VADD Refactor
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Experiment: moved `VADD` from a decode-time packed lane add into the same operand-register and lane-counter path used by `DOT`/`MAC`
+- Preserved behavior: `VXOR`, variable-precision `VADD`, variable-precision `DOT`/`MAC`, and accumulator byte reads
+- Local model/example tests: 23 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 10 pass, 0 fail
+- Run tag: `1x1-2rows-shared-vadd-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 3415
+- Sequential cells: 357 `sg13g2_dfrbpq_1`
+- Total mapped area: 47225.5056
+- Sequential area: 17489.0016
+
+Decision: reject this implementation. It is architecturally cleaner, but the lane-insertion muxing and extra active-op state increase area by 327 cells and 3066.9030 mapped area versus the current no-queue checkpoint. Keep the existing packed `VADD` implementation unless a deeper PU rewrite can share more arithmetic without adding result-lane mux cost.
