@@ -3,10 +3,10 @@
 SIM ?= icarus
 FST ?= -fst
 TOPLEVEL_LANG ?= verilog
-SRC_DIR = $(PWD)/../src
+SRC_DIR = $(CURDIR)/../src
 PROJECT_SOURCES = command_decoder.sv spi_frontend.sv pim_channel.sv tt_um_tiny_dram_pim.sv
 
-export PYTHONPATH := $(PWD)/..:$(PYTHONPATH)
+export PYTHONPATH := $(CURDIR)/..:$(PYTHONPATH)
 
 ifneq ($(GATES),yes)
 
@@ -21,15 +21,23 @@ COMPILE_ARGS += -DFUNCTIONAL
 COMPILE_ARGS += -DSIM
 VERILOG_SOURCES += $(PDK_ROOT)/ihp-sg13g2/libs.ref/sg13g2_io/verilog/sg13g2_io.v
 VERILOG_SOURCES += $(PDK_ROOT)/ihp-sg13g2/libs.ref/sg13g2_stdcell/verilog/sg13g2_stdcell.v
-VERILOG_SOURCES += $(PWD)/gate_level_netlist.v
+VERILOG_SOURCES += $(CURDIR)/gate_level_netlist.v
 
 endif
 
 COMPILE_ARGS += -g2012
 COMPILE_ARGS += -I$(SRC_DIR)
-VERILOG_SOURCES += $(PWD)/tb.v
+VERILOG_SOURCES += $(CURDIR)/tb.v
 
 TOPLEVEL = tb
 COCOTB_TEST_MODULES = test.test_spi
 
+.DEFAULT_GOAL := run
+
 include $(shell cocotb-config --makefiles)/Makefile.sim
+
+.PHONY: run
+run: sim
+ifeq ($(GATES),yes)
+	@python3 normalize_results.py results.xml
+endif
