@@ -6,7 +6,16 @@ module pim_channel #(
   input  logic             clk,
   input  logic             rst_n,
   input  logic             cmd_valid,
-  input  pim_pkg::pim_uop_t uop,
+  input  logic [3:0]       uop_op,
+  input  logic             uop_ch,
+  input  logic [2:0]       uop_subop,
+  input  logic [1:0]       uop_precision,
+  input  logic             uop_bank_a,
+  input  logic             uop_bank_b,
+  input  logic [1:0]       uop_row_a,
+  input  logic [1:0]       uop_row_b,
+  input  logic [2:0]       uop_flags,
+  input  logic [7:0]       uop_imm8,
   output logic             rsp_valid,
   output logic [7:0]       rsp_data,
   output logic [7:0]       status
@@ -43,6 +52,7 @@ module pim_channel #(
 
   // One-entry command queue. It accepts one command while this channel's PIM
   // datapath is busy; a second queued command sets sticky_error.
+  pim_uop_t incoming_uop;
   pim_uop_t pending_uop;
   logic pending_valid;
   pim_uop_t exec_uop;
@@ -73,7 +83,20 @@ module pim_channel #(
   assign refresh_busy = (refresh_busy_ctr != 3'd0);
   assign pim_busy = (pim_busy_ctr != 8'd0);
   assign exec_cmd_valid = pending_valid || cmd_valid;
-  assign exec_uop = pending_valid ? pending_uop : uop;
+  assign exec_uop = pending_valid ? pending_uop : incoming_uop;
+
+  always_comb begin
+    incoming_uop.op = uop_op;
+    incoming_uop.ch = uop_ch;
+    incoming_uop.subop = uop_subop;
+    incoming_uop.precision = uop_precision;
+    incoming_uop.bank_a = uop_bank_a;
+    incoming_uop.bank_b = uop_bank_b;
+    incoming_uop.row_a = uop_row_a;
+    incoming_uop.row_b = uop_row_b;
+    incoming_uop.flags = uop_flags;
+    incoming_uop.imm8 = uop_imm8;
+  end
   assign target_open = open[exec_uop.bank_a];
   assign target_row = active_row[exec_uop.bank_a];
   assign row_invalid = 1'b0;
@@ -431,7 +454,7 @@ module pim_channel #(
           if (pending_valid) begin
             sticky_error <= 1'b1;
           end else begin
-            pending_uop <= uop;
+            pending_uop <= incoming_uop;
             pending_valid <= 1'b1;
           end
         end
@@ -481,7 +504,7 @@ module pim_channel #(
           // Drain the queued command and optionally capture a new command in
           // the same cycle.
           pending_valid <= cmd_valid;
-          pending_uop <= uop;
+          pending_uop <= incoming_uop;
         end
 
         unique case (exec_uop.op)

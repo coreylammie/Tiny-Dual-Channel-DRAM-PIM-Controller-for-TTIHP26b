@@ -14,7 +14,16 @@ module tt_um_tiny_dram_pim (
 
   logic cmd_valid;
   logic [31:0] cmd_word;
-  pim_uop_t decoded_uop;
+  logic [3:0] decoded_op;
+  logic decoded_ch;
+  logic [2:0] decoded_subop;
+  logic [1:0] decoded_precision;
+  logic decoded_bank_a;
+  logic decoded_bank_b;
+  logic [1:0] decoded_row_a;
+  logic [1:0] decoded_row_b;
+  logic [2:0] decoded_flags;
+  logic [7:0] decoded_imm8;
   logic rsp_valid [NUM_CHANNELS-1:0];
   logic [7:0] rsp_data [NUM_CHANNELS-1:0];
   logic [7:0] ch_status [NUM_CHANNELS-1:0];
@@ -25,11 +34,20 @@ module tt_um_tiny_dram_pim (
   // decoded channel bit.
   command_decoder decoder (
     .cmd_word(cmd_word),
-    .uop(decoded_uop)
+    .op(decoded_op),
+    .ch(decoded_ch),
+    .subop(decoded_subop),
+    .precision(decoded_precision),
+    .bank_a(decoded_bank_a),
+    .bank_b(decoded_bank_b),
+    .row_a(decoded_row_a),
+    .row_b(decoded_row_b),
+    .flags(decoded_flags),
+    .imm8(decoded_imm8)
   );
 
-  wire cmd_ch0 = cmd_valid && (decoded_uop.ch == 1'b0);
-  wire cmd_ch1 = cmd_valid && (decoded_uop.ch == 1'b1);
+  wire cmd_ch0 = cmd_valid && (decoded_ch == 1'b0);
+  wire cmd_ch1 = cmd_valid && (decoded_ch == 1'b1);
 
   // Channel refresh phases are staggered so the two banks do not request
   // autonomous refresh on the same core cycle after reset.
@@ -37,7 +55,16 @@ module tt_um_tiny_dram_pim (
     .clk(clk),
     .rst_n(rst_n),
     .cmd_valid(cmd_ch0),
-    .uop(decoded_uop),
+    .uop_op(decoded_op),
+    .uop_ch(decoded_ch),
+    .uop_subop(decoded_subop),
+    .uop_precision(decoded_precision),
+    .uop_bank_a(decoded_bank_a),
+    .uop_bank_b(decoded_bank_b),
+    .uop_row_a(decoded_row_a),
+    .uop_row_b(decoded_row_b),
+    .uop_flags(decoded_flags),
+    .uop_imm8(decoded_imm8),
     .rsp_valid(rsp_valid[0]),
     .rsp_data(rsp_data[0]),
     .status(ch_status[0])
@@ -47,7 +74,16 @@ module tt_um_tiny_dram_pim (
     .clk(clk),
     .rst_n(rst_n),
     .cmd_valid(cmd_ch1),
-    .uop(decoded_uop),
+    .uop_op(decoded_op),
+    .uop_ch(decoded_ch),
+    .uop_subop(decoded_subop),
+    .uop_precision(decoded_precision),
+    .uop_bank_a(decoded_bank_a),
+    .uop_bank_b(decoded_bank_b),
+    .uop_row_a(decoded_row_a),
+    .uop_row_b(decoded_row_b),
+    .uop_flags(decoded_flags),
+    .uop_imm8(decoded_imm8),
     .rsp_valid(rsp_valid[1]),
     .rsp_data(rsp_data[1]),
     .status(ch_status[1])
