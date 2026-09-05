@@ -922,3 +922,21 @@ Decision: immediate VOP improved official adjusted movable area by 1383.251 um^2
 - Sequential area: 14843.6064
 
 Compared with the immediate-VOP checkpoint, active-bank PU state saves 28 sequential cells and 81.4212 mapped area, while total mapped cell count rises by 3. The result is small but positive and makes the DOT/MAC state more explicit: the operation retains which banks are active rather than copying both operand rows into extra flops.
+
+## Rejected 1x1 Serial-Multiply PU Experiment
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Experiment: replaced the single-cycle signed lane multiplier with a multi-cycle absolute-value shift/add product stage
+- Preserved behavior: `DOT` and `MAC` still supported INT1/INT2/INT4/INT8, with INT1 as a popcount and wider precisions stretched to eight busy cycles per row
+- Local model/example tests: 23 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 10 pass, 0 fail
+- Run tag: `1x1-2rows-serial-mul-pu-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 1 warning
+- Cells: 2911
+- Sequential cells: 341 `sg13g2_dfrbpq_1`
+- Total mapped area: 43047.6228
+- Sequential area: 16705.1808
+
+Decision: reject this implementation. The shift/add version lowers total cell count by 49 versus the active-bank PU state checkpoint, but the extra staging flops and control increase mapped area by 921.2238 and reintroduce a lint warning. For this small row width, the synthesized single-cycle lane multiplier is cheaper than the extra serial product state.
