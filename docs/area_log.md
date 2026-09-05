@@ -923,6 +923,21 @@ Decision: immediate VOP improved official adjusted movable area by 1383.251 um^2
 
 Compared with the immediate-VOP checkpoint, active-bank PU state saves 28 sequential cells and 81.4212 mapped area, while total mapped cell count rises by 3. The result is small but positive and makes the DOT/MAC state more explicit: the operation retains which banks are active rather than copying both operand rows into extra flops.
 
+## 1x1 Target Active-Bank PU State Official GDS Attempt
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Commit: `322bfd7`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 40370.400 um^2
+- GPL movable instances area after pin-density adjustment: 45631.495 um^2
+- GPL utilization: 157.668%
+- Failure: `[GPL-0301] Utilization 157.668 % exceeds 100%.`
+
+Decision: reducing retained PU state improved official adjusted movable area by 1921.594 um^2 versus the immediate-VOP checkpoint. This confirms the modular active-bank DOT/MAC state is worth keeping, but the design still needs roughly a further 36.6% reduction in adjusted placement demand to fit a 1x1 tile.
+
 ## Rejected 1x1 Serial-Multiply PU Experiment
 
 - Date: 2026-09-05
