@@ -663,3 +663,18 @@ The cleanup before public Actions keeps `docs/isa.md` as the canonical ISA docum
 - Sequential area: 22289.9040
 
 Decision: two rows per bank is a clean first reduction and preserves the desired 2-channel, 2-bank framing, but it is unlikely to fit the official 1x1 TinyTapeout IHP wrapper by itself. The previous official 1x1 run had a 28941.494 um^2 core area; this synthesis checkpoint is still about 2.25x that area before placement overhead.
+
+## 1x1 Target Official GDS Attempt
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Commit: `b5bf3d8`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 64692.432 um^2
+- GPL movable instances area after pin-density adjustment: 74320.634 um^2
+- GPL utilization: 256.796%
+- Failure: `[GPL-0301] Utilization 256.796 % exceeds 100%.`
+
+Decision: layout tuning is not enough for the current reduced-depth RTL. To fit a 1x1 coupon while preserving two channels and two banks per channel, the next experiment needs to remove or substantially simplify logic, not just shrink row storage. Likely cuts are STREAM control, secondary vector/reduction operations, command queueing, or configurable refresh state.
