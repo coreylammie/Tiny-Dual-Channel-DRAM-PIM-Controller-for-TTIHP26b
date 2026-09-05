@@ -102,4 +102,4 @@ For ordinary command acknowledgements without read data, the top level returns:
 | 3 | PIM busy |
 | 2 | bank 1 open |
 | 1 | bank 0 open |
-| 0 | pending command queued |
+| 0 | reserved, reads zero |

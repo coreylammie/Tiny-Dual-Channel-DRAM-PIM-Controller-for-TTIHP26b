@@ -88,11 +88,7 @@ module pim_channel #(
   logic [ROW_WIDTH-1:0] active_operand_a;
   logic [ROW_WIDTH-1:0] active_operand_b;
 
-  // One-entry command queue. It accepts one command while this channel's PIM
-  // datapath is busy; a second queued command sets sticky_error.
   pim_uop_t incoming_uop;
-  pim_uop_t pending_uop;
-  logic pending_valid;
   pim_uop_t exec_uop;
   logic exec_cmd_valid;
   logic [2:0] dot_lane;
@@ -111,8 +107,8 @@ module pim_channel #(
 
   assign refresh_busy = (refresh_busy_ctr != 3'd0);
   assign pim_busy = (pim_busy_ctr != 4'd0);
-  assign exec_cmd_valid = pending_valid || cmd_valid;
-  assign exec_uop = pending_valid ? pending_uop : incoming_uop;
+  assign exec_cmd_valid = cmd_valid;
+  assign exec_uop = incoming_uop;
 
   always_comb begin
     incoming_uop.op = uop_op;
@@ -154,7 +150,7 @@ module pim_channel #(
     pim_busy,
     open[1],
     open[0],
-    pending_valid
+    1'b0
   };
 
   integer bank_i;
@@ -308,8 +304,6 @@ module pim_channel #(
       vop_result <= '0;
       active_operand_a <= '0;
       active_operand_b <= '0;
-      pending_uop <= '0;
-      pending_valid <= 1'b0;
       dot_lane <= 3'd0;
       rsp_valid <= 1'b0;
       rsp_data <= 8'h00;
@@ -341,12 +335,7 @@ module pim_channel #(
 
       if (pim_busy) begin
         if (cmd_valid) begin
-          if (pending_valid) begin
-            sticky_error <= 1'b1;
-          end else begin
-            pending_uop <= incoming_uop;
-            pending_valid <= 1'b1;
-          end
+          sticky_error <= 1'b1;
         end
         pim_busy_ctr <= pim_busy_ctr - 4'd1;
         if (!active_is_vop) begin
@@ -363,13 +352,6 @@ module pim_channel #(
           rows[active_dest_bank][active_row[active_dest_bank]] <= vop_result;
         end
       end else if (exec_cmd_valid) begin
-        if (pending_valid) begin
-          // Drain the queued command and optionally capture a new command in
-          // the same cycle.
-          pending_valid <= cmd_valid;
-          pending_uop <= incoming_uop;
-        end
-
         unique case (exec_uop.op)
           OP_NOP: begin
             rsp_valid <= 1'b1;
@@ -505,7 +487,6 @@ module pim_channel #(
             acc <= '0;
             pim_busy_ctr <= 4'd0;
             active_is_vop <= 1'b0;
-            pending_valid <= 1'b0;
           end
           default: begin
             sticky_error <= 1'b1;

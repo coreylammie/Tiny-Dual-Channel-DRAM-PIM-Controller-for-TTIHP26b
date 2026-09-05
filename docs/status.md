@@ -10,13 +10,13 @@ This file is the short public-facing status snapshot. The detailed historical ar
 - Memory commands: `ACT`, `PRE`, `WR`, `RD`, `REF`, `STATUS`, `CONFIG`, `ABORT`, and `NOP`
 - PIM operations: `VXOR`, `VADD`, `DOT`, `MAC`, and `ACC`
 - Refresh: per-channel fixed-period automatic refresh with enable control
-- Queueing: one pending command slot per channel while the PIM datapath is busy
+- Busy handling: commands issued while the selected channel PIM datapath is busy set sticky error and are dropped
 
 ## Local Verification
 
 - Python model/example tests: 23 pass, 0 fail
-- Cocotb TinyTapeout-wrapper RTL tests from `test/`: 11 pass, 0 fail
-- Latest local synthesis checkpoint: 3488 cells, total mapped area 49655.8944, lint-clean
+- Cocotb TinyTapeout-wrapper RTL tests from `test/`: 10 pass, 0 fail
+- Latest local synthesis checkpoint: 3088 cells, total mapped area 44158.6026, lint-clean
 - Latest official TinyTapeout `1x1` GDS check: failed global placement at 188.485% utilization after fixing refresh timing
 - Latest local route/DRC checkpoint: not yet run for this no-STREAM branch
 - Routed standard-cell utilization: not yet measured for this no-STREAM branch

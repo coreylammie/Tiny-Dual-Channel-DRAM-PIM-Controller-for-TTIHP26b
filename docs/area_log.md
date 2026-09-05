@@ -815,3 +815,22 @@ Compared with the minimal-PU checkpoint, fixing refresh timing saves 89 mapped c
 - Failure: `[GPL-0301] Utilization 188.485 % exceeds 100%.`
 
 Decision: fixed refresh timing improved official adjusted movable area by 2934.006 um^2 versus the minimal-PU checkpoint. The design is still 1.88x the legal placement area, so the next cut should remove command queueing and reject new commands while the PIM datapath is busy.
+
+## 1x1 Target Without Command Queueing
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Feature change: removed the one-entry command queue; commands issued while the selected channel PIM datapath is busy are dropped and set sticky error
+- Preserved geometry: 2 channels x 2 banks/channel x 2 rows/bank x 8 bits/row
+- Preserved PIM operations: `VXOR`, `VADD`, `DOT`, `MAC`, and accumulator byte reads
+- Local model/example tests: 23 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 10 pass, 0 fail
+- Run tag: `1x1-2rows-no-queue-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 3088
+- Sequential cells: 355 `sg13g2_dfrbpq_1`
+- Total mapped area: 44158.6026
+- Sequential area: 17391.0240
+
+Compared with the fixed-refresh checkpoint, removing command queueing saves 400 mapped cells, 48 sequential cells, and 5497.2918 mapped area. This is the largest single 1x1-target cut after removing STREAM, but the design still remains above the 1x1 core area before placement overhead.

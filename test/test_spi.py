@@ -123,7 +123,7 @@ async def spi_routes_to_channel_one(dut):
 
 
 @cocotb.test(skip=GATE_LEVEL)
-async def spi_queues_one_command_while_pim_busy(dut):
+async def spi_command_while_pim_busy_sets_sticky_error(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset(dut)
     spi = SpiDriver(dut)
@@ -133,7 +133,7 @@ async def spi_queues_one_command_while_pim_busy(dut):
     await spi.transfer32(isa.wr(0, 0, 0b1010_1111).encode())
     await spi.transfer32(isa.act(0, 1, 1).encode())
     await spi.transfer32(isa.wr(0, 1, 0b1111_0001).encode())
-    await spi.transfer32(isa.reduce_dot(0, isa.Precision.INT1, 0, 1).encode())
+    await spi.transfer32(isa.reduce_dot(0, isa.Precision.INT2, 0, 1).encode())
 
     await RisingEdge(dut.clk)
     design = user_design(dut)
@@ -145,11 +145,11 @@ async def spi_queues_one_command_while_pim_busy(dut):
 
     await wait_core_clocks(dut, 160)
 
-    rsp = await spi.transfer32(isa.nop().encode())
+    rsp = await status_response(spi, 0)
 
     assert (rsp >> 24) == 0xA0
-    assert ((rsp >> 16) & 0x80) == 0
-    assert (rsp & 0x80) == 0
+    assert ((rsp >> 16) & 0x80) != 0
+    assert ((rsp >> 16) & 0x01) == 0
 
 
 @cocotb.test()
@@ -389,37 +389,3 @@ async def spi_dot_and_mac_int4_accumulate_signed_rows(dut):
 
     assert dot_acc == expected_dot
     assert mac_acc == expected_dot * 2
-
-
-@cocotb.test(skip=GATE_LEVEL)
-async def spi_second_queued_command_while_busy_sets_sticky_error(dut):
-    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
-    await reset(dut)
-    spi = SpiDriver(dut)
-
-    ch = 0
-    precision = isa.Precision.INT2
-    rows = [pack_lanes([1, -1, 0, 1], precision)] * 2
-
-    await spi.transfer32(isa.abort(ch).encode())
-    await spi.transfer32(isa.config_auto_refresh(ch, False).encode())
-    await write_packed_rows(spi, ch, 0, rows)
-    await write_packed_rows(spi, ch, 1, rows)
-    await spi.transfer32(isa.reduce_dot(ch, precision, 0, 1).encode())
-
-    await RisingEdge(dut.clk)
-    design = user_design(dut)
-    design.cmd_word.value = Force(isa.status(ch).encode())
-    design.cmd_valid.value = Force(1)
-    await RisingEdge(dut.clk)
-    design.cmd_word.value = Force(isa.status(ch).encode())
-    design.cmd_valid.value = Force(1)
-    await RisingEdge(dut.clk)
-    design.cmd_valid.value = Release()
-    design.cmd_word.value = Release()
-
-    await wait_core_clocks(dut, 220)
-    rsp = await status_response(spi, ch)
-
-    assert (rsp >> 24) == 0xA0
-    assert ((rsp >> 16) & 0x80) != 0
