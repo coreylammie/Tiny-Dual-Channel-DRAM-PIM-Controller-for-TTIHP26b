@@ -118,7 +118,7 @@ def _run_dot_chunk(
     w_values = list(weights) + [0] * (padded_len - len(weights))
 
     if rows_needed < 1 or rows_needed > ROWS_PER_BANK:
-        raise ValueError("dot chunk must use between 1 and 4 rows")
+        raise ValueError(f"dot chunk must use between 1 and {ROWS_PER_BANK} rows")
 
     model.execute(isa.abort(ch))
     model.execute(isa.config_auto_refresh(ch, False))

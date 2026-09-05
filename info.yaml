@@ -5,7 +5,7 @@ project:
   description: Standard-cell tiny dual-channel DRAM-PIM controller architecture
   language: SystemVerilog
   clock_hz: 10000000
-  tiles: "2x2"
+  tiles: "1x1"
   top_module: tt_um_tiny_dram_pim
   source_files:
     - "command_decoder.sv"

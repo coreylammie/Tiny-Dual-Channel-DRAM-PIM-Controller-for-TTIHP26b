@@ -5,7 +5,7 @@ from typing import Optional
 
 from .isa import Opcode, Command, Precision, Vop, Reduce
 
-ROWS_PER_BANK = 4
+ROWS_PER_BANK = 2
 BANKS_PER_CH = 2
 REF_INTERVAL = 255
 REF_CYCLES = 4

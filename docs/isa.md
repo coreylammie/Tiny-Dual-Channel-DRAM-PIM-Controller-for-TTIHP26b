@@ -65,7 +65,7 @@ The current 128-bit geometry implements all encoded row values 0 through 3.
 
 All `REDUCE` operations require both selected banks to be open and not refreshing. `SUM` and `POPCNT` consume only the active `bank A` row, but still use that shared REDUCE readiness check.
 
-`STREAM` uses `imm8[2:0]` as a row-pair count from 1 through 4. `row A` and `row B` are the starting rows for `bank A` and `bank B`; each streamed row pair increments both row indices by one. Commands with count 0, unsupported stream subopcodes, or start/count combinations that run past row 3 set sticky error.
+`STREAM` uses `imm8[2:0]` as a row-pair count from 1 through 2. `row A` and `row B` are the starting rows for `bank A` and `bank B`; each streamed row pair increments both row indices by one. Commands with count 0, unsupported stream subopcodes, or start/count combinations that run past row 1 set sticky error.
 
 `ACC` returns accumulator byte 0, 1, or 2 using `subopcode[1:0]`. `subopcode == 4` clears the accumulator after returning byte 0.
 

@@ -28,17 +28,19 @@ def test_bank_act_write_read_pre_sequence():
     assert model.channels[0].sticky_error
 
 
-def test_four_row_geometry_preserves_independent_rows():
+def test_two_row_geometry_preserves_independent_rows_and_rejects_row_two():
     model = TinyPimModel()
-    assert model.execute(isa.act(0, 0, 2)) is None
+    assert model.execute(isa.act(0, 0, 0)) is None
     assert model.execute(isa.wr(0, 0, 0x2A)) is None
-    assert model.execute(isa.act(0, 0, 3)) is None
+    assert model.execute(isa.act(0, 0, 1)) is None
     assert model.execute(isa.wr(0, 0, 0x3B)) is None
-    assert model.execute(isa.act(0, 0, 2)) is None
+    assert model.execute(isa.act(0, 0, 0)) is None
     assert model.execute(isa.rd(0, 0)) == 0x2A
-    assert model.execute(isa.act(0, 0, 3)) is None
+    assert model.execute(isa.act(0, 0, 1)) is None
     assert model.execute(isa.rd(0, 0)) == 0x3B
     assert not model.channels[0].sticky_error
+    assert model.execute(isa.act(0, 0, 2)) is None
+    assert model.channels[0].sticky_error
 
 
 def test_channels_are_independent():
@@ -179,8 +181,6 @@ def test_stream_dot_sweeps_rows_and_stream_mac_retains_accumulator():
     row_pairs = (
         (0b0000_0011, 0b0000_0101),
         (0b0000_1111, 0b0000_0011),
-        (0b1010_0000, 0b1110_0000),
-        (0b0000_0000, 0b1111_1111),
     )
     for row, (a, b) in enumerate(row_pairs):
         model.execute(isa.act(0, 0, row))
@@ -188,10 +188,10 @@ def test_stream_dot_sweeps_rows_and_stream_mac_retains_accumulator():
         model.execute(isa.act(0, 1, row))
         model.execute(isa.wr(0, 1, b))
 
-    model.execute(isa.stream(0, isa.Reduce.DOT, isa.Precision.INT1, 0, 1, 0, 0, 4))
-    assert model.execute(isa.acc(0, 0)) == 5
-    model.execute(isa.stream(0, isa.Reduce.MAC, isa.Precision.INT1, 0, 1, 0, 0, 4))
-    assert model.execute(isa.acc(0, 0)) == 10
+    model.execute(isa.stream(0, isa.Reduce.DOT, isa.Precision.INT1, 0, 1, 0, 0, 2))
+    assert model.execute(isa.acc(0, 0)) == 3
+    model.execute(isa.stream(0, isa.Reduce.MAC, isa.Precision.INT1, 0, 1, 0, 0, 2))
+    assert model.execute(isa.acc(0, 0)) == 6
 
 
 def test_vadd_int1_is_invalid():

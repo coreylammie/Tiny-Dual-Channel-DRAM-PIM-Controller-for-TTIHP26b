@@ -21,7 +21,7 @@ module pim_channel #(
   output logic [7:0]       status
 );
   localparam int BANKS_PER_CH = 2;
-  localparam int ROWS_PER_BANK = 4;
+  localparam int ROWS_PER_BANK = 2;
   localparam int ROW_WIDTH = 8;
   localparam int ACC_WIDTH = 18;
   localparam int REF_INTERVAL = 255;
@@ -73,10 +73,10 @@ module pim_channel #(
 
   localparam logic [7:0] REF_RELOAD_DEFAULT = REF_INTERVAL[7:0] - 8'd1;
 
-  // Minimal row storage: two banks, four addressable rows per bank, 8 bits/row.
+  // Minimal row storage: two banks, two addressable rows per bank, 8 bits/row.
   logic [ROW_WIDTH-1:0] rows [BANKS_PER_CH-1:0][ROWS_PER_BANK-1:0];
   logic open [BANKS_PER_CH-1:0];
-  logic [1:0] active_row [BANKS_PER_CH-1:0];
+  logic active_row [BANKS_PER_CH-1:0];
 
   // Automatic refresh state. A zero counter creates a pending refresh; refresh
   // starts when no PIM operation is busy. Forced REF bypasses refresh_enable.
@@ -115,14 +115,14 @@ module pim_channel #(
   logic [1:0] stream_precision;
   logic stream_bank_a;
   logic stream_bank_b;
-  logic [1:0] stream_row_a;
-  logic [1:0] stream_row_b;
+  logic stream_row_a;
+  logic stream_row_b;
   logic [2:0] stream_remaining;
   logic       refresh_busy;
   logic       pim_busy;
   logic       target_open;
   logic       target_refreshing;
-  logic [1:0] target_row;
+  logic target_row;
   logic       row_invalid;
   logic       both_operands_ready;
   logic       either_operand_refreshing;
@@ -149,7 +149,7 @@ module pim_channel #(
   end
   assign target_open = open[exec_uop.bank_a];
   assign target_row = active_row[exec_uop.bank_a];
-  assign row_invalid = 1'b0;
+  assign row_invalid = exec_uop.row_a[1];
   assign target_refreshing = refresh_busy && (refresh_bank == exec_uop.bank_a);
   assign both_operands_ready = open[exec_uop.bank_a] && open[exec_uop.bank_b];
   assign either_operand_refreshing =
@@ -358,7 +358,7 @@ module pim_channel #(
     begin
       end_a = {1'b0, start_a} + count;
       end_b = {1'b0, start_b} + count;
-      valid_stream_count = (count != 3'd0) && (end_a <= 3'd4) && (end_b <= 3'd4);
+      valid_stream_count = (count != 3'd0) && (end_a <= 3'd2) && (end_b <= 3'd2);
     end
   endfunction
 
@@ -366,8 +366,8 @@ module pim_channel #(
     input logic [1:0] precision,
     input logic bank_a,
     input logic bank_b,
-    input logic [1:0] row_a,
-    input logic [1:0] row_b
+    input logic row_a,
+    input logic row_b
   );
     logic [7:0] stream_operand_a;
     logic [7:0] stream_operand_b;
@@ -440,7 +440,7 @@ module pim_channel #(
     if (!rst_n) begin
       for (bank_i = 0; bank_i < BANKS_PER_CH; bank_i = bank_i + 1) begin
         open[bank_i] <= 1'b0;
-        active_row[bank_i] <= 2'd0;
+        active_row[bank_i] <= 1'b0;
         for (row_i = 0; row_i < ROWS_PER_BANK; row_i = row_i + 1) begin
           rows[bank_i][row_i] <= '0;
         end
@@ -468,8 +468,8 @@ module pim_channel #(
       stream_precision <= PREC_INT1;
       stream_bank_a <= 1'b0;
       stream_bank_b <= 1'b0;
-      stream_row_a <= 2'd0;
-      stream_row_b <= 2'd0;
+      stream_row_a <= 1'b0;
+      stream_row_b <= 1'b0;
       stream_remaining <= 3'd0;
       rsp_valid <= 1'b0;
       rsp_data <= 8'h00;
@@ -538,8 +538,8 @@ module pim_channel #(
                     stream_row_a,
                     stream_row_b
                   );
-                  stream_row_a <= stream_row_a + 2'd1;
-                  stream_row_b <= stream_row_b + 2'd1;
+                  stream_row_a <= stream_row_a + 1'b1;
+                  stream_row_b <= stream_row_b + 1'b1;
                   stream_remaining <= stream_remaining - 3'd1;
                 end
               end
@@ -567,7 +567,7 @@ module pim_channel #(
               sticky_error <= 1'b1;
             end else begin
               open[exec_uop.bank_a] <= 1'b1;
-              active_row[exec_uop.bank_a] <= exec_uop.row_a;
+              active_row[exec_uop.bank_a] <= exec_uop.row_a[0];
             end
           end
           OP_PRE: begin
@@ -686,8 +686,8 @@ module pim_channel #(
               stream_precision <= exec_uop.precision;
               stream_bank_a <= exec_uop.bank_a;
               stream_bank_b <= exec_uop.bank_b;
-              stream_row_a <= exec_uop.row_a + 2'd1;
-              stream_row_b <= exec_uop.row_b + 2'd1;
+              stream_row_a <= exec_uop.row_a[0] + 1'b1;
+              stream_row_b <= exec_uop.row_b[0] + 1'b1;
               stream_remaining <= exec_uop.imm8[2:0] - 3'd1;
               if (exec_uop.subop == REDUCE_DOT) begin
                 acc <= '0;
@@ -696,8 +696,8 @@ module pim_channel #(
                 exec_uop.precision,
                 exec_uop.bank_a,
                 exec_uop.bank_b,
-                exec_uop.row_a,
-                exec_uop.row_b
+                exec_uop.row_a[0],
+                exec_uop.row_b[0]
               );
             end
           end

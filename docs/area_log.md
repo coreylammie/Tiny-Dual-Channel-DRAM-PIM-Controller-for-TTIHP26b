@@ -643,3 +643,23 @@ Decision: keep the config control subops. They are low-cost, useful for software
 - Physical status: unchanged from `stage3b-config-control-klayout-drc`
 
 The cleanup before public Actions keeps `docs/isa.md` as the canonical ISA document, shortens the README, adds `docs/status.md`, and updates CI/local test scripts to include the dense-layer Python regression.
+
+## 1x1 Target, 2 Rows Per Bank Detail
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Flow: model/example pytest, cocotb RTL simulation, and LibreLane Classic stopped at `Yosys.Synthesis`
+- Feature change: reduced each bank from four 8-bit rows to two 8-bit rows while preserving two channels and two banks per channel
+- Official TinyTapeout tile setting: `1x1`
+- Storage geometry: 2 channels x 2 banks/channel x 2 rows/bank x 8 bits/row = 64 bits
+- Model/example tests: 23 pass, 0 fail
+- Cocotb TinyTapeout-wrapper RTL tests: 11 pass, 0 fail
+- Lint errors: 0
+- Lint timing construct errors: 0
+- Lint warnings: 0
+- Cells: 4815
+- Sequential cells: 455 `sg13g2_dfrbpq_1`
+- Total mapped area: 65116.0566
+- Sequential area: 22289.9040
+
+Decision: two rows per bank is a clean first reduction and preserves the desired 2-channel, 2-bank framing, but it is unlikely to fit the official 1x1 TinyTapeout IHP wrapper by itself. The previous official 1x1 run had a 28941.494 um^2 core area; this synthesis checkpoint is still about 2.25x that area before placement overhead.

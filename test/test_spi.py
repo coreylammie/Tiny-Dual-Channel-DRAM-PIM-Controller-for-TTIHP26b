@@ -93,12 +93,12 @@ async def spi_back_to_back_status_frames(dut):
 
 
 @cocotb.test()
-async def spi_act_write_read_row_three(dut):
+async def spi_act_write_read_row_one(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset(dut)
     spi = SpiDriver(dut)
 
-    await spi.transfer32(isa.act(0, 0, 3).encode())
+    await spi.transfer32(isa.act(0, 0, 1).encode())
     await spi.transfer32(isa.wr(0, 0, 0x5A).encode())
     await spi.transfer32(isa.rd(0, 0).encode())
     rsp = await spi.transfer32(isa.nop().encode())
@@ -228,16 +228,7 @@ async def spi_extra_pim_ops_and_stream_dot(dut):
     await spi.transfer32(isa.wr(0, 0, 0b0000_1111).encode())
     await spi.transfer32(isa.act(0, 1, 1).encode())
     await spi.transfer32(isa.wr(0, 1, 0b0000_0011).encode())
-    await spi.transfer32(isa.act(0, 0, 2).encode())
-    await spi.transfer32(isa.wr(0, 0, 0b1010_0000).encode())
-    await spi.transfer32(isa.act(0, 1, 2).encode())
-    await spi.transfer32(isa.wr(0, 1, 0b1110_0000).encode())
-    await spi.transfer32(isa.act(0, 0, 3).encode())
-    await spi.transfer32(isa.wr(0, 0, 0b0000_0000).encode())
-    await spi.transfer32(isa.act(0, 1, 3).encode())
-    await spi.transfer32(isa.wr(0, 1, 0b1111_1111).encode())
-
-    await spi.transfer32(isa.stream(0, isa.Reduce.DOT, isa.Precision.INT1, 0, 1, 0, 0, 4).encode())
+    await spi.transfer32(isa.stream(0, isa.Reduce.DOT, isa.Precision.INT1, 0, 1, 0, 0, 2).encode())
     await wait_core_clocks(dut, 620)
     await spi.transfer32(isa.acc(0, 0).encode())
     stream_rsp = await spi.transfer32(isa.nop().encode())
@@ -256,10 +247,10 @@ async def spi_extra_pim_ops_and_stream_dot(dut):
     sub_rsp = await spi.transfer32(isa.nop().encode())
 
     assert (stream_rsp >> 24) == 0xA0
-    assert (stream_rsp & 0xFF) == 5
-    assert (popcnt_rsp & 0xFF) == 0
-    assert (xnor_rsp & 0xFF) == 0xF8
-    assert (sub_rsp & 0xFF) == 0x11
+    assert (stream_rsp & 0xFF) == 3
+    assert (popcnt_rsp & 0xFF) == 4
+    assert (xnor_rsp & 0xFF) == 0x04
+    assert (sub_rsp & 0xFF) == 0x0C
 
 
 @cocotb.test()
@@ -273,10 +264,10 @@ async def spi_dense_layer_mixed_precision_stream_dot(dut):
     weight_precision = isa.Precision.INT2
     execution_precision = isa.Precision.INT4
     lanes_per_row = 2
-    activations = [1, -2, 3, 0, -1, 2]
+    activations = [1, -2, 3, 0]
     weights = [
-        [1, -1, 1, 0, -2, 1],
-        [-1, 0, 1, -2, 1, 1],
+        [1, -1, 1, 0],
+        [-1, 0, 1, -2],
     ]
     bias = [1, -2]
     expected_dot = [
@@ -396,13 +387,13 @@ async def spi_second_queued_command_while_busy_sets_sticky_error(dut):
 
     ch = 0
     precision = isa.Precision.INT2
-    rows = [pack_lanes([1, -1, 0, 1], precision)] * 4
+    rows = [pack_lanes([1, -1, 0, 1], precision)] * 2
 
     await spi.transfer32(isa.abort(ch).encode())
     await spi.transfer32(isa.config_auto_refresh(ch, False).encode())
     await write_packed_rows(spi, ch, 0, rows)
     await write_packed_rows(spi, ch, 1, rows)
-    await spi.transfer32(isa.stream(ch, isa.Reduce.DOT, precision, 0, 1, 0, 0, 4).encode())
+    await spi.transfer32(isa.stream(ch, isa.Reduce.DOT, precision, 0, 1, 0, 0, 2).encode())
 
     await RisingEdge(dut.clk)
     design = user_design(dut)

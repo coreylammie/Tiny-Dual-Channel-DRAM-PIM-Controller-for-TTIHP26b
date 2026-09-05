@@ -10,11 +10,11 @@ The current checkpoint implements the transport and memory-control foundation pl
 SPI slave
   -> 32-bit command decoder
   -> channel select
-     -> channel 0: 2 banks x 4 rows x 8 bits
-     -> channel 1: 2 banks x 4 rows x 8 bits
+     -> channel 0: 2 banks x 2 rows x 8 bits
+     -> channel 1: 2 banks x 2 rows x 8 bits
 ```
 
-Each bank stores four 8-bit rows, an open-row bit, and a two-bit active-row index. There is no duplicated row-buffer storage. `ACT` records the selected row, `WR` and `RD` target the currently active row, and `PRE` closes the bank.
+Each bank stores two 8-bit rows, an open-row bit, and a two-bit active-row index. There is no duplicated row-buffer storage. `ACT` records the selected row, `WR` and `RD` target the currently active row, and `PRE` closes the bank.
 
 Each channel owns independent refresh state. Channel 0 starts at refresh phase 0 and channel 1 starts at phase 32 to avoid synchronized refresh behavior. `CONFIG` can update/read the selected channel's automatic refresh reload counter and enable/disable autonomous refresh scheduling. Forced `REF` commands remain available when autonomous refresh is disabled.
 
