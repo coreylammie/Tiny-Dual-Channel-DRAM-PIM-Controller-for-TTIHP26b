@@ -800,3 +800,18 @@ Decision: removing the secondary PU operations improves official adjusted movabl
 - Sequential area: 19742.4864
 
 Compared with the minimal-PU checkpoint, fixing refresh timing saves 89 mapped cells, 16 sequential cells, and 1696.9176 mapped area. The remaining gap is still large, so command queueing or compute precision width are now the likely next cuts if official GDS remains well over 100%.
+
+## 1x1 Target Fixed Refresh Timing Official GDS Attempt
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Commit: `1f772d8`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 48722.083 um^2
+- GPL movable instances area after pin-density adjustment: 54550.334 um^2
+- GPL utilization: 188.485%
+- Failure: `[GPL-0301] Utilization 188.485 % exceeds 100%.`
+
+Decision: fixed refresh timing improved official adjusted movable area by 2934.006 um^2 versus the minimal-PU checkpoint. The design is still 1.88x the legal placement area, so the next cut should remove command queueing and reject new commands while the PIM datapath is busy.
