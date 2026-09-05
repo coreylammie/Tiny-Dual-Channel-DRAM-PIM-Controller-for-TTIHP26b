@@ -9,7 +9,8 @@ USE_SLANG: true
 CLOCK_PORT: clk
 CLOCK_PERIOD: 100
 
-# Conservative one-tile IHP26b-sized macro estimate (to be updated).
+# Standalone local LibreLane checkpoint config. The official TinyTapeout build
+# uses the tile template selected by info.yaml.
 FP_CORE_UTIL: 45
 PDN_VOFFSET: 5
 PDN_HOFFSET: 5

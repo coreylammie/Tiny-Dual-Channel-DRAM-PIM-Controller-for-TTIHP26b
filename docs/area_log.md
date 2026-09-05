@@ -79,6 +79,7 @@
 | 2026-09-04 | `python -m pytest test/test_model.py test/test_dense_layer_demo.py` | PASS, 23 model/example tests including dense-layer mixed-precision simulation. |
 | 2026-09-04 | `make` and `make` from `test/` | PASS, 8 cocotb RTL tests in both direct-DUT and TinyTapeout-wrapper entry points, including dense-layer mixed-precision `STREAM.DOT`. |
 | 2026-09-04 | `scripts/run_tests.sh` | PASS, 23 model/example tests and 11 TinyTapeout-wrapper cocotb RTL tests. Added sticky-error/abort, signed INT4 stream MAC, and queue-overflow coverage. |
+| 2026-09-05 | GitHub Actions `gds` on official TT IHP `1x1` template | FAIL at global placement: standard-cell demand was about 85275.778 um^2 against a 28941.494 um^2 1x1 core, reported as 294.649% utilization. Updated `info.yaml` to `2x2` for the current feature set. |
 
 ## Stage 2 Synthesis Detail
 

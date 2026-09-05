@@ -1,6 +1,6 @@
 # Tiny Dual-Channel DRAM-PIM Controller for TTIHP26b
 
-This project asks a deliberately small question: how much of a DRAM processing-in-memory controller can fit inside one TinyTapeout IHP tile if everything is built from standard-cell RTL?
+This project asks a deliberately small question: how much of a DRAM processing-in-memory controller can fit in a tiny TinyTapeout IHP standard-cell macro?
 
 The result is a tiny dual-channel DRAM-PIM controller with real memory-control behavior, refresh state, command queueing, and cross-bank compute. It is not a density-competitive DRAM macro. It is a silicon-testable controller architecture for near-memory operations under an extreme area budget. The useful idea is the compromise: keep the ISA expressive enough for row moves, status/debug, low-precision vector operations, dot products, MACs, and short row streams, but serialize the expensive arithmetic lanes enough that the design still routes locally.
 
@@ -64,6 +64,7 @@ Current verification checkpoint:
 - Model/example tests: 23 passing
 - Cocotb SPI RTL tests: 11 TinyTapeout-wrapper tests passing
 - Synthesis: 5495 cells, total mapped area 75687.2046
+- Official TinyTapeout area target: `2x2` tiles for the current feature set
 - Local KLayout/Magic DRC: 0 route DRC errors, 0 Magic DRC errors, 0 KLayout DRC errors, and 0 antenna violations under generic fallback SDC
 - Routed standard-cell utilization: 56.1497%
 - Decision: the lane-serial DOT/MAC compromise is locally routed/DRC-clean under the standalone LibreLane/generic-SDC caveat.

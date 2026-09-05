@@ -19,10 +19,11 @@ This file is the short public-facing status snapshot. The detailed historical ar
 - Latest local synthesis checkpoint: 5495 cells, total mapped area 75687.2046
 - Latest local route/DRC checkpoint: 0 route DRC errors, 0 Magic DRC errors, 0 KLayout DRC errors, 0 antenna violations
 - Routed standard-cell utilization: 56.1497%
+- Official TinyTapeout tile setting: `2x2`; the current feature set exceeds the `1x1` IHP template capacity
 
 ## Remaining External Check
 
-Final TinyTapeout confidence still requires the official GitHub Actions flow on a public repository:
+Final TinyTapeout confidence still requires the official GitHub Actions flow to complete:
 
 - `test` workflow for Ubuntu cocotb regression
 - `gds` workflow for TinyTapeout GDS build, precheck, gate-level test, and viewer generation
