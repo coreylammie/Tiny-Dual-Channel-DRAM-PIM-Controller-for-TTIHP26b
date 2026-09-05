@@ -12,7 +12,7 @@ class Opcode(IntEnum):
     WR = 0x4
     VOP = 0x5
     REDUCE = 0x6
-    STREAM = 0x7
+    RESERVED_7 = 0x7
     ACC = 0x8
     REF = 0x9
     STATUS = 0xA
@@ -188,29 +188,6 @@ def reduce_xnordot(ch: int, bank_a: int, bank_b: int) -> Command:
         precision=Precision.INT1,
         bank_a=bank_a,
         bank_b=bank_b,
-    )
-
-
-def stream(
-    ch: int,
-    subop: Reduce,
-    precision: Precision,
-    bank_a: int,
-    bank_b: int,
-    row_a: int,
-    row_b: int,
-    count: int,
-) -> Command:
-    return Command(
-        Opcode.STREAM,
-        ch=ch,
-        subop=subop,
-        precision=precision,
-        bank_a=bank_a,
-        bank_b=bank_b,
-        row_a=row_a,
-        row_b=row_b,
-        imm8=count,
     )
 
 

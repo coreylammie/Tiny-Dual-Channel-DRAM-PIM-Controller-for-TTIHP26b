@@ -175,7 +175,7 @@ def test_sum_popcnt_and_xnordot_reductions():
     assert model.execute(isa.acc(1, 1)) == 0xFF
 
 
-def test_stream_dot_sweeps_rows_and_stream_mac_retains_accumulator():
+def test_dot_then_mac_sweeps_rows_under_host_control():
     model = TinyPimModel()
     model.execute(isa.abort(0))
     row_pairs = (
@@ -188,10 +188,24 @@ def test_stream_dot_sweeps_rows_and_stream_mac_retains_accumulator():
         model.execute(isa.act(0, 1, row))
         model.execute(isa.wr(0, 1, b))
 
-    model.execute(isa.stream(0, isa.Reduce.DOT, isa.Precision.INT1, 0, 1, 0, 0, 2))
+    model.execute(isa.act(0, 0, 0))
+    model.execute(isa.act(0, 1, 0))
+    model.execute(isa.reduce_dot(0, isa.Precision.INT1, 0, 1))
+    model.execute(isa.act(0, 0, 1))
+    model.execute(isa.act(0, 1, 1))
+    model.execute(isa.reduce_mac(0, isa.Precision.INT1, 0, 1))
     assert model.execute(isa.acc(0, 0)) == 3
-    model.execute(isa.stream(0, isa.Reduce.MAC, isa.Precision.INT1, 0, 1, 0, 0, 2))
+    for row in range(2):
+        model.execute(isa.act(0, 0, row))
+        model.execute(isa.act(0, 1, row))
+        model.execute(isa.reduce_mac(0, isa.Precision.INT1, 0, 1))
     assert model.execute(isa.acc(0, 0)) == 6
+
+
+def test_reserved_opcode_sets_sticky_error():
+    model = TinyPimModel()
+    model.execute(isa.Command(isa.Opcode.RESERVED_7))
+    assert model.channels[0].sticky_error
 
 
 def test_vadd_int1_is_invalid():

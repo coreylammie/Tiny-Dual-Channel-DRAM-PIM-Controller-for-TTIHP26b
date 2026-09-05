@@ -45,18 +45,9 @@ The current RTL starts each PIM operation as an atomic channel operation. Refres
 | MAC | INT2 | 4 |
 | MAC | INT4 | 2 |
 | MAC | INT8 | 1 |
-| STREAM.DOT | INT1 | 1 x row count |
-| STREAM.DOT | INT2 | 4 x row count |
-| STREAM.DOT | INT4 | 2 x row count |
-| STREAM.DOT | INT8 | 1 x row count |
-| STREAM.MAC | INT1 | 1 x row count |
-| STREAM.MAC | INT2 | 4 x row count |
-| STREAM.MAC | INT4 | 2 x row count |
-| STREAM.MAC | INT8 | 1 x row count |
-
 `DOT` and `MAC` use the same lane-serial accumulator datapath. INT1 reduces all eight bit pairs through a popcount term in one busy cycle. INT2, INT4, and INT8 add one signed lane product per busy cycle. `DOT` clears the accumulator at operation start; `MAC` preserves the existing accumulator and adds into it. This is the compromise between the rejected one-cycle full parallel dot-product path and the earlier 144-cycle one-bit serial carry path.
 
-`STREAM.DOT` and `STREAM.MAC` reuse that same lane-serial engine across consecutive row pairs. `imm8[2:0]` selects a count from 1 through 2; count 0 is invalid. `STREAM.DOT` clears the accumulator once before the first row pair. `STREAM.MAC` keeps the previous accumulator value.
+Multi-row dot products are host-driven sequences of `ACT`, `DOT`, and `MAC`; there is no autonomous row-walk command in the reduced `1x1` target branch.
 
 ## Configurable Refresh
 

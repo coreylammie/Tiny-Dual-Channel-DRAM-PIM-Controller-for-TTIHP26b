@@ -34,7 +34,6 @@ module pim_channel #(
   localparam logic [3:0] OP_WR     = 4'h4;
   localparam logic [3:0] OP_VOP    = 4'h5;
   localparam logic [3:0] OP_REDUCE = 4'h6;
-  localparam logic [3:0] OP_STREAM = 4'h7;
   localparam logic [3:0] OP_ACC    = 4'h8;
   localparam logic [3:0] OP_REF    = 4'h9;
   localparam logic [3:0] OP_STATUS = 4'ha;
@@ -89,8 +88,8 @@ module pim_channel #(
   logic       refresh_overdue;
   logic       sticky_error;
 
-  // PIM operation state. VOPs are delayed writes; DOT/MAC/STREAM use the
-  // accumulator and lane-serial dot-product state below.
+  // PIM operation state. VOPs are delayed writes; DOT/MAC use the accumulator
+  // and lane-serial dot-product state below.
   logic [ACC_WIDTH-1:0] acc;
   logic [7:0] pim_busy_ctr;
   logic [3:0] active_op;
@@ -109,15 +108,6 @@ module pim_channel #(
   logic exec_cmd_valid;
   logic [2:0] dot_lane;
 
-  // STREAM walks consecutive row pairs, feeding each pair into the same DOT/MAC
-  // accumulator datapath as a standalone REDUCE operation.
-  logic stream_active;
-  logic [1:0] stream_precision;
-  logic stream_bank_a;
-  logic stream_bank_b;
-  logic stream_row_a;
-  logic stream_row_b;
-  logic [2:0] stream_remaining;
   logic       refresh_busy;
   logic       pim_busy;
   logic       target_open;
@@ -164,6 +154,7 @@ module pim_channel #(
     1'b0,
     exec_uop.ch,
     exec_uop.subop[2],
+    exec_uop.row_b,
     exec_uop.flags[2:1]
   };
 
@@ -348,49 +339,6 @@ module pim_channel #(
     end
   endfunction
 
-  function automatic logic valid_stream_count (
-    input logic [1:0] start_a,
-    input logic [1:0] start_b,
-    input logic [2:0] count
-  );
-    logic [2:0] end_a;
-    logic [2:0] end_b;
-    begin
-      end_a = {1'b0, start_a} + count;
-      end_b = {1'b0, start_b} + count;
-      valid_stream_count = (count != 3'd0) && (end_a <= 3'd2) && (end_b <= 3'd2);
-    end
-  endfunction
-
-  task automatic start_stream_reduce (
-    input logic [1:0] precision,
-    input logic bank_a,
-    input logic bank_b,
-    input logic row_a,
-    input logic row_b
-  );
-    logic [7:0] stream_operand_a;
-    logic [7:0] stream_operand_b;
-    begin
-      // Capture row data before updating active_row so each streamed row pair
-      // is reduced exactly once.
-      stream_operand_a = rows[bank_a][row_a];
-      stream_operand_b = rows[bank_b][row_b];
-      open[bank_a] <= 1'b1;
-      open[bank_b] <= 1'b1;
-      active_row[bank_a] <= row_a;
-      active_row[bank_b] <= row_b;
-      active_op <= OP_REDUCE;
-      active_precision <= precision;
-      active_dest_bank <= 1'b0;
-      vop_result <= '0;
-      active_operand_a <= stream_operand_a;
-      active_operand_b <= stream_operand_b;
-      dot_lane <= 3'd0;
-      pim_busy_ctr <= dot_latency(precision);
-    end
-  endtask
-
   function automatic logic [2:0] dot_last_lane (
     input logic [1:0] precision
   );
@@ -464,13 +412,6 @@ module pim_channel #(
       pending_uop <= '0;
       pending_valid <= 1'b0;
       dot_lane <= 3'd0;
-      stream_active <= 1'b0;
-      stream_precision <= PREC_INT1;
-      stream_bank_a <= 1'b0;
-      stream_bank_b <= 1'b0;
-      stream_row_a <= 1'b0;
-      stream_row_b <= 1'b0;
-      stream_remaining <= 3'd0;
       rsp_valid <= 1'b0;
       rsp_data <= 8'h00;
     end else begin
@@ -521,28 +462,12 @@ module pim_channel #(
         end
         if (pim_busy_ctr == 8'd1) begin
           // Complete the atomic operation. VOP commits its delayed row write;
-          // STREAM either advances to the next row pair or terminates.
+          // REDUCE has already accumulated its final lane term.
           unique case (active_op)
             OP_VOP: begin
               rows[active_dest_bank][active_row[active_dest_bank]] <= vop_result;
             end
             OP_REDUCE: begin
-              if (stream_active) begin
-                if (stream_remaining == 3'd0) begin
-                  stream_active <= 1'b0;
-                end else begin
-                  start_stream_reduce(
-                    stream_precision,
-                    stream_bank_a,
-                    stream_bank_b,
-                    stream_row_a,
-                    stream_row_b
-                  );
-                  stream_row_a <= stream_row_a + 1'b1;
-                  stream_row_b <= stream_row_b + 1'b1;
-                  stream_remaining <= stream_remaining - 3'd1;
-                end
-              end
             end
             default: begin
               sticky_error <= 1'b1;
@@ -672,35 +597,6 @@ module pim_channel #(
               pim_busy_ctr <= dot_latency(exec_uop.precision);
             end
           end
-          OP_STREAM: begin
-            // STREAM opens and reduces consecutive row pairs. It is blocked
-            // while refresh is pending/busy to avoid mid-stream row conflicts.
-            if (refresh_busy || refresh_pending) begin
-              sticky_error <= 1'b1;
-            end else if ((exec_uop.subop != REDUCE_DOT) && (exec_uop.subop != REDUCE_MAC)) begin
-              sticky_error <= 1'b1;
-            end else if (!valid_stream_count(exec_uop.row_a, exec_uop.row_b, exec_uop.imm8[2:0])) begin
-              sticky_error <= 1'b1;
-            end else begin
-              stream_active <= 1'b1;
-              stream_precision <= exec_uop.precision;
-              stream_bank_a <= exec_uop.bank_a;
-              stream_bank_b <= exec_uop.bank_b;
-              stream_row_a <= exec_uop.row_a[0] + 1'b1;
-              stream_row_b <= exec_uop.row_b[0] + 1'b1;
-              stream_remaining <= exec_uop.imm8[2:0] - 3'd1;
-              if (exec_uop.subop == REDUCE_DOT) begin
-                acc <= '0;
-              end
-              start_stream_reduce(
-                exec_uop.precision,
-                exec_uop.bank_a,
-                exec_uop.bank_b,
-                exec_uop.row_a[0],
-                exec_uop.row_b[0]
-              );
-            end
-          end
           OP_ACC: begin
             rsp_valid <= 1'b1;
             unique case (exec_uop.subop[1:0])
@@ -754,8 +650,6 @@ module pim_channel #(
             pim_busy_ctr <= 8'd0;
             active_op <= OP_NOP;
             pending_valid <= 1'b0;
-            stream_active <= 1'b0;
-            stream_remaining <= 3'd0;
           end
           default: begin
             sticky_error <= 1'b1;

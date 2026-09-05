@@ -63,7 +63,7 @@ def run_dense_layer(
     model: TinyPimModel | None = None,
     ch: int = 0,
 ) -> DenseRun:
-    """Run a quantized dense layer through the PIM model's STREAM.DOT path.
+    """Run a quantized dense layer through the PIM model's DOT/MAC path.
 
     `weights` is indexed as `[output][input]`. INT1 is treated as unsigned
     0/1 data, matching the RTL DOT semantics. INT2/INT4/INT8 are signed
@@ -130,7 +130,14 @@ def _run_dot_chunk(
         model.execute(isa.act(ch, 1, row))
         model.execute(isa.wr(ch, 1, w_row))
 
-    model.execute(isa.stream(ch, isa.Reduce.DOT, precision, 0, 1, 0, 0, rows_needed))
+    for row in range(rows_needed):
+        model.execute(isa.act(ch, 0, row))
+        model.execute(isa.act(ch, 1, row))
+        if row == 0:
+            model.execute(isa.reduce_dot(ch, precision, 0, 1))
+        else:
+            model.execute(isa.reduce_mac(ch, precision, 0, 1))
+
     acc0 = model.execute(isa.acc(ch, 0)) or 0
     acc1 = model.execute(isa.acc(ch, 1)) or 0
     acc2 = model.execute(isa.acc(ch, 2)) or 0

@@ -8,18 +8,18 @@ This file is the short public-facing status snapshot. The detailed historical ar
 - Interface: fixed 32-bit SPI command framing with next-frame responses
 - Physical I/O: SPI is implemented on `ui_in[0]`, `ui_in[1]`, `ui_in[2]`, and `uo_out[0]`
 - Memory commands: `ACT`, `PRE`, `WR`, `RD`, `REF`, `STATUS`, `CONFIG`, `ABORT`, and `NOP`
-- PIM operations: `VXOR`, `VAND`, `VOR`, `VADD`, `VSUB`, `DOT`, `MAC`, `SUM`, `POPCNT`, `XNORDOT`, `STREAM.DOT`, `STREAM.MAC`, and `ACC`
+- PIM operations: `VXOR`, `VAND`, `VOR`, `VADD`, `VSUB`, `DOT`, `MAC`, `SUM`, `POPCNT`, `XNORDOT`, and `ACC`
 - Refresh: per-channel automatic refresh with configurable reload and enable control
 - Queueing: one pending command slot per channel while the PIM datapath is busy
 
 ## Local Verification
 
-- Python model/example tests: 23 pass, 0 fail
+- Python model/example tests: 24 pass, 0 fail
 - Cocotb TinyTapeout-wrapper RTL tests from `test/`: 11 pass, 0 fail
-- Latest local synthesis checkpoint: 4815 cells, total mapped area 65116.0566, lint-clean
-- Latest official TinyTapeout `1x1` GDS check: failed global placement at 256.796% utilization
-- Latest local route/DRC checkpoint: not yet run for this reduced-depth branch
-- Routed standard-cell utilization: not yet measured for this reduced-depth branch
+- Latest local synthesis checkpoint: 4102 cells, total mapped area 56587.9608, lint-clean
+- Latest official TinyTapeout `1x1` GDS check: failed global placement at 256.796% utilization before removing autonomous row-walk control
+- Latest local route/DRC checkpoint: not yet run for this no-STREAM branch
+- Routed standard-cell utilization: not yet measured for this no-STREAM branch
 - Official TinyTapeout tile setting: `1x1` on the reduced-depth target branch
 
 ## Remaining External Check

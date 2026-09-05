@@ -222,31 +222,6 @@ class Channel:
                     bank.rows[bank.active_row], bank_b.rows[bank_b.active_row], cmd.precision
                 )
             return None
-        if cmd.op == Opcode.STREAM:
-            count = cmd.imm8 & 0x7
-            if self.refresh_busy_ctr or self.refresh_pending:
-                self.sticky_error = True
-                return None
-            if cmd.subop not in (Reduce.DOT, Reduce.MAC):
-                self.sticky_error = True
-                return None
-            if count == 0 or cmd.row_a + count > ROWS_PER_BANK or cmd.row_b + count > ROWS_PER_BANK:
-                self.sticky_error = True
-                return None
-            if cmd.subop == Reduce.DOT:
-                self.acc = 0
-            bank_b = self.banks[cmd.bank_b]
-            for offset in range(count):
-                row_a = cmd.row_a + offset
-                row_b = cmd.row_b + offset
-                bank.open = True
-                bank.active_row = row_a
-                bank_b.open = True
-                bank_b.active_row = row_b
-                self.acc = (
-                    self.acc + self._dot(bank.rows[row_a], bank_b.rows[row_b], cmd.precision)
-                ) & ((1 << 18) - 1)
-            return None
         if cmd.op == Opcode.ACC:
             result = self._acc_byte(cmd.subop & 0x3)
             if cmd.subop == 4:

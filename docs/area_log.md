@@ -678,3 +678,23 @@ Decision: two rows per bank is a clean first reduction and preserves the desired
 - Failure: `[GPL-0301] Utilization 256.796 % exceeds 100%.`
 
 Decision: layout tuning is not enough for the current reduced-depth RTL. To fit a 1x1 coupon while preserving two channels and two banks per channel, the next experiment needs to remove or substantially simplify logic, not just shrink row storage. Likely cuts are STREAM control, secondary vector/reduction operations, command queueing, or configurable refresh state.
+
+## 1x1 Target Without Autonomous Row-Walk
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Feature change: removed the autonomous `STREAM.DOT`/`STREAM.MAC` control path and reserved opcode `0x7`
+- Preserved geometry: 2 channels x 2 banks/channel x 2 rows/bank x 8 bits/row
+- Preserved PIM operations: `VXOR`, `VAND`, `VOR`, `VADD`, `VSUB`, `DOT`, `MAC`, `SUM`, `POPCNT`, `XNORDOT`, and accumulator byte reads
+- Host impact: multi-row dot products now use explicit `ACT` plus `DOT`/`MAC` commands per row pair
+- Local model/example tests: 24 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 11 pass, 0 fail
+- Run tag: `1x1-2rows-no-stream-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 4102
+- Sequential cells: 429 `sg13g2_dfrbpq_1`
+- Total mapped area: 56587.9608
+- Sequential area: 21016.1952
+
+Compared with the prior 2-row branch checkpoint, removing autonomous row-walk control saves 713 mapped cells and 8528.0958 mapped area. The synthesis area is still about 1.96x the official 28941.494 um^2 1x1 core area before placement overhead, so the next hard check is the official TinyTapeout GDS flow on this branch.

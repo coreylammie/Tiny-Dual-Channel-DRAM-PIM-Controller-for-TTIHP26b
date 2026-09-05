@@ -13,12 +13,12 @@ Commands are fixed 32-bit SPI words, MSB first. Responses are shifted out on the
 | 21 | bank A |
 | 20 | bank B / destination |
 | 19:18 | row A |
-| 17:16 | row B |
+| 17:16 | reserved row B field |
 | 15:11 | reserved |
 | 10:8 | flags |
 | 7:0 | immediate data |
 
-The current 128-bit geometry implements all encoded row values 0 through 3.
+The reduced `1x1` target geometry implements row values 0 through 1 for `row A`. Row values 2 and 3 are encoded but currently invalid. The current RTL operates on the active row of `bank B`, so bits 17:16 are reserved for future row-walk or direct row-pair operations.
 
 ## Opcodes
 
@@ -31,7 +31,7 @@ The current 128-bit geometry implements all encoded row values 0 through 3.
 | 0x4 | WR | Writes `imm8` to active row in `bank A` |
 | 0x5 | VOP | Vector PIM operation selected by `subopcode` |
 | 0x6 | REDUCE | Reduction PIM operation selected by `subopcode` |
-| 0x7 | STREAM | Autonomous row-pair stream selected by `subopcode` |
+| 0x7 | RESERVED | Reserved; sets sticky error |
 | 0x8 | ACC | Reads accumulator byte selected by `subopcode[1:0]` |
 | 0x9 | REF | Forces refresh on `bank A` |
 | 0xA | STATUS | Reads channel status |
@@ -58,14 +58,10 @@ The current 128-bit geometry implements all encoded row values 0 through 3.
 | REDUCE | 2 | SUM | INT1/2/4/8 | sums active `bank A` row lanes into 18-bit accumulator |
 | REDUCE | 3 | POPCNT | INT1 | popcounts active `bank A` row into 18-bit accumulator |
 | REDUCE | 4 | XNORDOT | INT1 | writes `2 * popcount(XNOR(A,B)) - 8` into 18-bit accumulator |
-| STREAM | 0 | STREAM.DOT | INT1/2/4/8 | clears accumulator, then DOTs consecutive row pairs |
-| STREAM | 1 | STREAM.MAC | INT1/2/4/8 | preserves accumulator, then MACs consecutive row pairs |
 
 `DOT.INT1` and `MAC.INT1` treat row bits as unsigned `{0,1}` lanes. `DOT.INT2/4/8` and `MAC.INT2/4/8` use signed two's-complement lanes. The RTL computes INT1 as a one-cycle bit-popcount term and computes INT2/4/8 through one signed lane product per busy cycle. `DOT` clears the accumulator before adding the dot product; `MAC` preserves the existing accumulator and adds into it.
 
-All `REDUCE` operations require both selected banks to be open and not refreshing. `SUM` and `POPCNT` consume only the active `bank A` row, but still use that shared REDUCE readiness check.
-
-`STREAM` uses `imm8[2:0]` as a row-pair count from 1 through 2. `row A` and `row B` are the starting rows for `bank A` and `bank B`; each streamed row pair increments both row indices by one. Commands with count 0, unsupported stream subopcodes, or start/count combinations that run past row 1 set sticky error.
+All `REDUCE` operations require both selected banks to be open and not refreshing. `SUM` and `POPCNT` consume only the active `bank A` row, but still use that shared REDUCE readiness check. Multi-row dot products are host-driven by activating each row pair and issuing `DOT` for the first row pair followed by `MAC` for subsequent row pairs.
 
 `ACC` returns accumulator byte 0, 1, or 2 using `subopcode[1:0]`. `subopcode == 4` clears the accumulator after returning byte 0.
 
