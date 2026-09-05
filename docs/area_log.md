@@ -834,3 +834,18 @@ Decision: fixed refresh timing improved official adjusted movable area by 2934.0
 - Sequential area: 17391.0240
 
 Compared with the fixed-refresh checkpoint, removing command queueing saves 400 mapped cells, 48 sequential cells, and 5497.2918 mapped area. This is the largest single 1x1-target cut after removing STREAM, but the design still remains above the 1x1 core area before placement overhead.
+
+## 1x1 Target Without Command Queueing Official GDS Attempt
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Commit: `6a059e9`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 43505.683 um^2
+- GPL movable instances area after pin-density adjustment: 48936.340 um^2
+- GPL utilization: 169.087%
+- Failure: `[GPL-0301] Utilization 169.087 % exceeds 100%.`
+
+Decision: removing command queueing improved official adjusted movable area by 5613.994 um^2 versus the fixed-refresh checkpoint. The design remains 1.69x the legal placement area, so fitting 1x1 now likely requires simplifying the variable-precision compute datapath itself.
