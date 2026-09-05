@@ -887,3 +887,38 @@ Decision: reject this implementation. It is architecturally cleaner, but the lan
 - Sequential area: 16411.2480
 
 Compared with the no-command-queue checkpoint, immediate VOP saves 131 mapped cells, 20 sequential cells, and 1950.7824 mapped area. This is a keeper: it makes the PU boundary cleaner by separating immediate row transforms from the multi-cycle reduction datapath and also improves area.
+
+## 1x1 Target Immediate VOP Official GDS Attempt
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Commit: `031c97c`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 41899.939 um^2
+- GPL movable instances area after pin-density adjustment: 47553.089 um^2
+- GPL utilization: 164.308%
+- Failure: `[GPL-0301] Utilization 164.308 % exceeds 100%.`
+
+Decision: immediate VOP improved official adjusted movable area by 1383.251 um^2 versus the no-command-queue checkpoint, but the design is still 1.64x the legal placement area. Continue reducing the retained DOT/MAC datapath and command state while preserving the two-channel, two-bank DRAM-PIM controller framing.
+
+## 1x1 Target Active-Bank PU State Refactor
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Feature change: replaced retained DOT/MAC operand row flops with active bank selectors, then narrowed the DOT/MAC busy counter and lane index to their true ranges
+- Preserved geometry: 2 channels x 2 banks/channel x 2 rows/bank x 8 bits/row
+- Preserved PIM operations: `VXOR`, `VADD`, `DOT`, `MAC`, and accumulator byte reads
+- Preserved compute precision: `DOT` and `MAC` still support INT1/INT2/INT4/INT8; `VADD` still supports INT2/INT4/INT8
+- Local model/example tests: 23 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 10 pass, 0 fail
+- Run tag: `1x1-2rows-bank-counter-slim-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 2960
+- Sequential cells: 303 `sg13g2_dfrbpq_1`
+- Total mapped area: 42126.3990
+- Sequential area: 14843.6064
+
+Compared with the immediate-VOP checkpoint, active-bank PU state saves 28 sequential cells and 81.4212 mapped area, while total mapped cell count rises by 3. The result is small but positive and makes the DOT/MAC state more explicit: the operation retains which banks are active rather than copying both operand rows into extra flops.

@@ -80,15 +80,15 @@ module pim_channel #(
   // PIM operation state. DOT/MAC use the accumulator and lane-serial
   // dot-product state below. VOPs update the destination row at decode time.
   logic [ACC_WIDTH-1:0] acc;
-  logic [3:0] pim_busy_ctr;
+  logic [2:0] pim_busy_ctr;
   logic [1:0] active_precision;
-  logic [ROW_WIDTH-1:0] active_operand_a;
-  logic [ROW_WIDTH-1:0] active_operand_b;
+  logic       active_bank_a;
+  logic       active_bank_b;
 
   pim_uop_t incoming_uop;
   pim_uop_t exec_uop;
   logic exec_cmd_valid;
-  logic [2:0] dot_lane;
+  logic [1:0] dot_lane;
 
   logic       refresh_busy;
   logic       pim_busy;
@@ -100,10 +100,12 @@ module pim_channel #(
   logic       either_operand_refreshing;
   logic [ROW_WIDTH-1:0] operand_a;
   logic [ROW_WIDTH-1:0] operand_b;
+  logic [ROW_WIDTH-1:0] active_reduce_a;
+  logic [ROW_WIDTH-1:0] active_reduce_b;
   logic last_dot_lane;
 
   assign refresh_busy = (refresh_busy_ctr != 3'd0);
-  assign pim_busy = (pim_busy_ctr != 4'd0);
+  assign pim_busy = (pim_busy_ctr != 3'd0);
   assign exec_cmd_valid = cmd_valid;
   assign exec_uop = incoming_uop;
 
@@ -126,6 +128,8 @@ module pim_channel #(
     refresh_busy && ((refresh_bank == exec_uop.bank_a) || (refresh_bank == exec_uop.bank_b));
   assign operand_a = rows[exec_uop.bank_a][active_row[exec_uop.bank_a]];
   assign operand_b = rows[exec_uop.bank_b][active_row[exec_uop.bank_b]];
+  assign active_reduce_a = rows[active_bank_a][active_row[active_bank_a]];
+  assign active_reduce_b = rows[active_bank_b][active_row[active_bank_b]];
   assign last_dot_lane = (dot_lane == dot_last_lane(active_precision));
 
   // Some decoded fields are reserved for future ISA growth. Keep them visibly
@@ -156,7 +160,7 @@ module pim_channel #(
   function automatic logic signed [8:0] sign_extend_lane (
     input logic [7:0] value,
     input logic [1:0] precision,
-    input logic [2:0] lane
+    input logic [1:0] lane
   );
     logic signed [1:0] lane2;
     logic signed [3:0] lane4;
@@ -220,7 +224,7 @@ module pim_channel #(
     input logic [1:0] precision,
     input logic [7:0] a,
     input logic [7:0] b,
-    input logic [2:0] lane
+    input logic [1:0] lane
   );
     logic signed [8:0] lane_a;
     logic signed [8:0] lane_b;
@@ -237,29 +241,28 @@ module pim_channel #(
     end
   endfunction
 
-  function automatic logic [2:0] dot_last_lane (
+  function automatic logic [1:0] dot_last_lane (
     input logic [1:0] precision
   );
     begin
       unique case (precision)
-        PREC_INT1: dot_last_lane = 3'd7;
-        PREC_INT2: dot_last_lane = 3'd3;
-        PREC_INT4: dot_last_lane = 3'd1;
-        default:   dot_last_lane = 3'd0;
+        PREC_INT2: dot_last_lane = 2'd3;
+        PREC_INT4: dot_last_lane = 2'd1;
+        default:   dot_last_lane = 2'd0;
       endcase
     end
   endfunction
 
-  function automatic logic [3:0] dot_latency (
+  function automatic logic [2:0] dot_latency (
     input logic [1:0] precision
   );
     begin
       // Lane-serial compromise: one cycle for INT1/INT8, two cycles for INT4,
       // and four cycles for INT2.
       unique case (precision)
-        PREC_INT2: dot_latency = 4'd4;
-        PREC_INT4: dot_latency = 4'd2;
-        default:   dot_latency = 4'd1;
+        PREC_INT2: dot_latency = 3'd4;
+        PREC_INT4: dot_latency = 3'd2;
+        default:   dot_latency = 3'd1;
       endcase
     end
   endfunction
@@ -281,11 +284,11 @@ module pim_channel #(
       refresh_overdue <= 1'b0;
       sticky_error <= 1'b0;
       acc <= '0;
-      pim_busy_ctr <= 4'd0;
+      pim_busy_ctr <= 3'd0;
       active_precision <= PREC_INT1;
-      active_operand_a <= '0;
-      active_operand_b <= '0;
-      dot_lane <= 3'd0;
+      active_bank_a <= 1'b0;
+      active_bank_b <= 1'b0;
+      dot_lane <= 2'd0;
       rsp_valid <= 1'b0;
       rsp_data <= 8'h00;
     end else begin
@@ -318,14 +321,14 @@ module pim_channel #(
         if (cmd_valid) begin
           sticky_error <= 1'b1;
         end
-        pim_busy_ctr <= pim_busy_ctr - 4'd1;
+        pim_busy_ctr <= pim_busy_ctr - 3'd1;
         // DOT/MAC accumulates one lane term each cycle. DOT cleared acc when
         // it started; MAC leaves the prior accumulator value intact.
-        acc <= acc + dot_lane_term(active_precision, active_operand_a, active_operand_b, dot_lane);
-        if (last_dot_lane || (pim_busy_ctr == 4'd1)) begin
-          dot_lane <= 3'd0;
+        acc <= acc + dot_lane_term(active_precision, active_reduce_a, active_reduce_b, dot_lane);
+        if (last_dot_lane || (pim_busy_ctr == 3'd1)) begin
+          dot_lane <= 2'd0;
         end else begin
-          dot_lane <= dot_lane + 3'd1;
+          dot_lane <= dot_lane + 2'd1;
         end
       end else if (exec_cmd_valid) begin
         unique case (exec_uop.op)
@@ -406,9 +409,9 @@ module pim_channel #(
               sticky_error <= 1'b1;
             end else begin
               active_precision <= exec_uop.precision;
-              active_operand_a <= operand_a;
-              active_operand_b <= operand_b;
-              dot_lane <= 3'd0;
+              active_bank_a <= exec_uop.bank_a;
+              active_bank_b <= exec_uop.bank_b;
+              dot_lane <= 2'd0;
               if (exec_uop.subop == REDUCE_DOT) begin
                 acc <= '0;
               end
@@ -457,7 +460,7 @@ module pim_channel #(
             refresh_overdue <= 1'b0;
             sticky_error <= 1'b0;
             acc <= '0;
-            pim_busy_ctr <= 4'd0;
+            pim_busy_ctr <= 3'd0;
           end
           default: begin
             sticky_error <= 1'b1;

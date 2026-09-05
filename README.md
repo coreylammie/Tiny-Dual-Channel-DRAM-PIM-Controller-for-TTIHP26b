@@ -63,11 +63,11 @@ Current verification checkpoint:
 - Opcode `0x7` is reserved and sets sticky error
 - Model/example tests: 23 passing
 - Cocotb SPI RTL tests: 10 TinyTapeout-wrapper tests passing
-- Synthesis: 2957 cells, total mapped area 42207.8202, lint-clean
+- Synthesis: 2960 cells, total mapped area 42126.3990, lint-clean
 - Official TinyTapeout area target: `1x1` tile for the reduced-depth feature set
 - Local KLayout/Magic DRC: not yet rerun for this no-STREAM branch
 - Routed standard-cell utilization: not yet measured for this no-STREAM branch
-- Decision: removing autonomous row-walk control is the current 1x1 fitting experiment while preserving two channels and two banks per channel.
+- Decision: the current 1x1 fitting experiment preserves two channels and two banks per channel, keeps variable-precision DOT/MAC, and continues trimming retained PU state.
 
 ## Documentation
 
