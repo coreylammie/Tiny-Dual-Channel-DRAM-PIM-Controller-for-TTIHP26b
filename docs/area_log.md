@@ -732,3 +732,18 @@ Decision: removing autonomous row-walk control helps materially but is not enoug
 Compared with the no-STREAM baseline, this saves 353.5812 mapped area and 10 sequential cells, but increases total cell count by 25 due to changed combinational mapping. A more aggressive same-ISA experiment that made VOP write back immediately was rejected because it worsened mapped area to 56977.7544 despite reducing sequential cells.
 
 Decision: straightforward RTL cleanup is not enough to make 1x1 viable. The remaining gap is still roughly 56234.3796 / 28941.494 = 1.94x before placement overhead, so the next useful experiments need architectural simplification rather than placement-only tuning or small coding-style changes.
+
+## 1x1 Target RTL Slimming Official GDS Attempt
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Commit: `8df3e8e`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 54983.578 um^2
+- GPL movable instances area after pin-density adjustment: 62326.882 um^2
+- GPL utilization: 215.355%
+- Failure: `[GPL-0301] Utilization 215.355 % exceeds 100%.`
+
+Decision: the area-efficiency refactor reduced official adjusted movable area by 1786.368 um^2 versus the no-STREAM checkpoint, but the design still requires about 2.15x the legal placement area for a 1x1 tile. This confirms that normal RTL cleanup and placement/layout tuning cannot close the remaining gap by themselves.
