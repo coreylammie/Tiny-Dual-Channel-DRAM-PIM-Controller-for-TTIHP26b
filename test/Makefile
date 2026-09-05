@@ -4,7 +4,7 @@ SIM ?= icarus
 FST ?= -fst
 TOPLEVEL_LANG ?= verilog
 SRC_DIR = $(PWD)/../src
-PROJECT_SOURCES = pim_pkg.sv command_decoder.sv spi_frontend.sv pim_channel.sv tt_um_tiny_dram_pim.sv
+PROJECT_SOURCES = command_decoder.sv spi_frontend.sv pim_channel.sv tt_um_tiny_dram_pim.sv
 
 export PYTHONPATH := $(PWD)/..:$(PYTHONPATH)
 

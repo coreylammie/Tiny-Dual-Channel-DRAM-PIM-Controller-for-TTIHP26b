@@ -8,7 +8,6 @@ project:
   tiles: "1x1"
   top_module: tt_um_tiny_dram_pim
   source_files:
-    - "pim_pkg.sv"
     - "command_decoder.sv"
     - "spi_frontend.sv"
     - "pim_channel.sv"

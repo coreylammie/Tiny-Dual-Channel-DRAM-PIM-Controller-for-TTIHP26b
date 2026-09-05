@@ -1,7 +1,6 @@
 # LibreLane standalone checkpoint config for the TinyTapeout user macro.
 DESIGN_NAME: tt_um_tiny_dram_pim
 VERILOG_FILES:
-  - dir::src/pim_pkg.sv
   - dir::src/command_decoder.sv
   - dir::src/spi_frontend.sv
   - dir::src/pim_channel.sv

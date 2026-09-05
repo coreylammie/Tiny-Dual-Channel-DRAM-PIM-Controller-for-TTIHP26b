@@ -20,7 +20,57 @@ module pim_channel #(
   output logic [7:0]       rsp_data,
   output logic [7:0]       status
 );
-  import pim_pkg::*;
+  localparam int BANKS_PER_CH = 2;
+  localparam int ROWS_PER_BANK = 4;
+  localparam int ROW_WIDTH = 8;
+  localparam int ACC_WIDTH = 18;
+  localparam int REF_INTERVAL = 255;
+  localparam int REF_CYCLES = 4;
+
+  localparam logic [3:0] OP_NOP    = 4'h0;
+  localparam logic [3:0] OP_ACT    = 4'h1;
+  localparam logic [3:0] OP_PRE    = 4'h2;
+  localparam logic [3:0] OP_RD     = 4'h3;
+  localparam logic [3:0] OP_WR     = 4'h4;
+  localparam logic [3:0] OP_VOP    = 4'h5;
+  localparam logic [3:0] OP_REDUCE = 4'h6;
+  localparam logic [3:0] OP_STREAM = 4'h7;
+  localparam logic [3:0] OP_ACC    = 4'h8;
+  localparam logic [3:0] OP_REF    = 4'h9;
+  localparam logic [3:0] OP_STATUS = 4'ha;
+  localparam logic [3:0] OP_CONFIG = 4'hb;
+  localparam logic [3:0] OP_ABORT  = 4'hc;
+
+  localparam logic [1:0] PREC_INT1 = 2'b00;
+  localparam logic [1:0] PREC_INT2 = 2'b01;
+  localparam logic [1:0] PREC_INT4 = 2'b10;
+  localparam logic [1:0] PREC_INT8 = 2'b11;
+
+  localparam logic [2:0] VOP_XOR = 3'd0;
+  localparam logic [2:0] VOP_ADD = 3'd1;
+  localparam logic [2:0] VOP_AND = 3'd2;
+  localparam logic [2:0] VOP_OR  = 3'd3;
+  localparam logic [2:0] VOP_SUB = 3'd4;
+
+  localparam logic [2:0] REDUCE_DOT     = 3'd0;
+  localparam logic [2:0] REDUCE_MAC     = 3'd1;
+  localparam logic [2:0] REDUCE_SUM     = 3'd2;
+  localparam logic [2:0] REDUCE_POPCNT  = 3'd3;
+  localparam logic [2:0] REDUCE_XNORDOT = 3'd4;
+
+  typedef struct packed {
+    logic [3:0] op;
+    logic       ch;
+    logic [2:0] subop;
+    logic [1:0] precision;
+    logic       bank_a;
+    logic       bank_b;
+    logic [1:0] row_a;
+    logic [1:0] row_b;
+    logic [2:0] flags;
+    logic [7:0] imm8;
+  } pim_uop_t;
+
   localparam logic [7:0] REF_RELOAD_DEFAULT = REF_INTERVAL[7:0] - 8'd1;
 
   // Minimal row storage: two banks, four addressable rows per bank, 8 bits/row.

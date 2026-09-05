@@ -10,7 +10,7 @@ module tt_um_tiny_dram_pim (
   input  wire       clk,
   input  wire       rst_n
 );
-  import pim_pkg::*;
+  localparam int NUM_CHANNELS = 2;
 
   logic cmd_valid;
   logic [31:0] cmd_word;
