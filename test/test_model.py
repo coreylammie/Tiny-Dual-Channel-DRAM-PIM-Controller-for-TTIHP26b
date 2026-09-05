@@ -121,22 +121,6 @@ def test_vadd_int4_wraps_each_lane():
     assert model.execute(isa.rd(1, 1)) == 0x80
 
 
-def test_boolean_vops_write_selected_destination_bank():
-    model = TinyPimModel()
-    open_and_write_pair(model, 1, 0xA5, 0x3C)
-    model.execute(isa.vop(1, isa.Vop.AND, isa.Precision.INT1, 0, 1, dest_bank=0))
-    assert model.execute(isa.rd(1, 0)) == 0x24
-    model.execute(isa.vop(1, isa.Vop.OR, isa.Precision.INT1, 0, 1, dest_bank=1))
-    assert model.execute(isa.rd(1, 1)) == 0x3C
-
-
-def test_vsub_int4_wraps_each_lane():
-    model = TinyPimModel()
-    open_and_write_pair(model, 1, 0x10, 0x21)
-    model.execute(isa.vop(1, isa.Vop.SUB, isa.Precision.INT4, 0, 1, dest_bank=0))
-    assert model.execute(isa.rd(1, 0)) == 0xFF
-
-
 def test_dot_int1_uses_unsigned_bit_semantics():
     model = TinyPimModel()
     open_and_write_pair(model, 1, 0b1010_1111, 0b1111_0001)
@@ -161,18 +145,6 @@ def test_dot_int4_uses_signed_lanes():
     assert model.execute(isa.acc(1, 0)) == 0xEF
     assert model.execute(isa.acc(1, 1)) == 0xFF
     assert model.execute(isa.acc(1, 2)) == 0x03
-
-
-def test_sum_popcnt_and_xnordot_reductions():
-    model = TinyPimModel()
-    open_and_write_pair(model, 1, 0b1010_1111, 0b1111_0001)
-    model.execute(isa.reduce_sum(1, isa.Precision.INT1, 0))
-    assert model.execute(isa.acc(1, 0)) == 6
-    model.execute(isa.reduce_popcnt(1, 1))
-    assert model.execute(isa.acc(1, 0)) == 5
-    model.execute(isa.reduce_xnordot(1, 0, 1))
-    assert model.execute(isa.acc(1, 0)) == 0xFE
-    assert model.execute(isa.acc(1, 1)) == 0xFF
 
 
 def test_dot_then_mac_sweeps_rows_under_host_control():
@@ -213,3 +185,30 @@ def test_vadd_int1_is_invalid():
     open_and_write_pair(model, 1, 0x01, 0x01)
     model.execute(isa.vop(1, isa.Vop.ADD, isa.Precision.INT1, 0, 1, dest_bank=0))
     assert model.channels[1].sticky_error
+
+
+def test_reserved_secondary_vop_subops_set_sticky_error():
+    model = TinyPimModel()
+    for subop in (isa.Vop.RESERVED_2, isa.Vop.RESERVED_3, isa.Vop.RESERVED_4):
+        model.execute(isa.abort(1))
+        open_and_write_pair(model, 1, 0xA5, 0x3C)
+        model.execute(isa.vop(1, subop, isa.Precision.INT4, 0, 1, dest_bank=0))
+        assert model.channels[1].sticky_error
+
+
+def test_reserved_secondary_reduce_subops_set_sticky_error():
+    model = TinyPimModel()
+    for subop in (isa.Reduce.RESERVED_2, isa.Reduce.RESERVED_3, isa.Reduce.RESERVED_4):
+        model.execute(isa.abort(1))
+        open_and_write_pair(model, 1, 0b1010_1111, 0b1111_0001)
+        model.execute(
+            isa.Command(
+                isa.Opcode.REDUCE,
+                ch=1,
+                subop=subop,
+                precision=isa.Precision.INT1,
+                bank_a=0,
+                bank_b=1,
+            )
+        )
+        assert model.channels[1].sticky_error

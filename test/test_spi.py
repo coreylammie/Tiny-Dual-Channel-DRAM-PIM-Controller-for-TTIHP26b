@@ -214,7 +214,7 @@ async def spi_config_refresh_reload_sets_overdue(dut):
 
 
 @cocotb.test()
-async def spi_extra_pim_ops_and_reserved_opcode_7(dut):
+async def spi_reserved_secondary_pim_ops_and_opcode_7(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset(dut)
     spi = SpiDriver(dut)
@@ -228,27 +228,40 @@ async def spi_extra_pim_ops_and_reserved_opcode_7(dut):
     await spi.transfer32(isa.wr(0, 0, 0b0000_1111).encode())
     await spi.transfer32(isa.act(0, 1, 1).encode())
     await spi.transfer32(isa.wr(0, 1, 0b0000_0011).encode())
-    await spi.transfer32(isa.reduce_popcnt(0, 0).encode())
-    await spi.transfer32(isa.acc(0, 0).encode())
-    popcnt_rsp = await spi.transfer32(isa.nop().encode())
+    await spi.transfer32(
+        isa.Command(
+            isa.Opcode.REDUCE,
+            ch=0,
+            subop=isa.Reduce.RESERVED_2,
+            precision=isa.Precision.INT1,
+            bank_a=0,
+            bank_b=1,
+        ).encode()
+    )
+    reduce_reserved_rsp = await status_response(spi, 0)
 
-    await spi.transfer32(isa.reduce_xnordot(0, 0, 1).encode())
-    await spi.transfer32(isa.acc(0, 0).encode())
-    xnor_rsp = await spi.transfer32(isa.nop().encode())
-
-    await spi.transfer32(isa.vop(0, isa.Vop.SUB, isa.Precision.INT4, 0, 1, dest_bank=0).encode())
-    await wait_core_clocks(dut, 8)
-    await spi.transfer32(isa.rd(0, 0).encode())
-    sub_rsp = await spi.transfer32(isa.nop().encode())
+    await spi.transfer32(isa.abort(0).encode())
+    await spi.transfer32(isa.act(0, 0, 1).encode())
+    await spi.transfer32(isa.act(0, 1, 1).encode())
+    await spi.transfer32(
+        isa.vop(
+            0,
+            isa.Vop.RESERVED_2,
+            isa.Precision.INT4,
+            0,
+            1,
+            dest_bank=0,
+        ).encode()
+    )
+    vop_reserved_rsp = await status_response(spi, 0)
 
     await spi.transfer32(
         isa.Command(isa.Opcode.RESERVED_7, ch=0, subop=isa.Reduce.DOT, imm8=2).encode()
     )
     reserved_rsp = await status_response(spi, 0)
 
-    assert (popcnt_rsp & 0xFF) == 4
-    assert (xnor_rsp & 0xFF) == 0x04
-    assert (sub_rsp & 0xFF) == 0x0C
+    assert ((reduce_reserved_rsp >> 16) & 0x80) != 0
+    assert ((vop_reserved_rsp >> 16) & 0x80) != 0
     assert ((reserved_rsp >> 16) & 0x80) != 0
 
 

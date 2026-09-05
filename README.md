@@ -9,7 +9,7 @@ The result is a tiny dual-channel DRAM-PIM controller with real memory-control b
 - **Host interface:** a 32-bit SPI command frame enters through the TinyTapeout `ui_in`/`uo_out` pins. Responses are returned on the following SPI frame with status and read data.
 - **Two independent channels:** each channel has its own control state, refresh timing, sticky error bit, pending command slot, bank pair, and accumulator.
 - **Banked row store:** each channel contains two banks with two 8-bit rows per bank. `ACT`, `PRE`, `WR`, and `RD` expose a DRAM-like open-row programming model.
-- **Near-bank processing unit:** the PU operates across the selected rows in the two banks. It supports bitwise vector ops, lane-wise add/subtract, lane sums, dot products, MAC, popcount, and XNOR-dot.
+- **Near-bank processing unit:** the PU operates across the selected rows in the two banks. The reduced `1x1` target keeps `VXOR`, lane-wise `VADD`, `DOT`, `MAC`, and accumulator reads.
 - **Variable compute resolution:** each compute command selects how an 8-bit row is interpreted: eight INT1 lanes, four signed INT2 lanes, two signed INT4 lanes, or one signed INT8 lane.
 - **Host-driven row sequencing:** multi-row dot products are expressed as explicit `ACT` plus `DOT`/`MAC` commands for each row pair, preserving the operation while avoiding autonomous row-walk control state.
 
@@ -56,14 +56,14 @@ Set `TO_STEP` to continue further through the LibreLane classic flow.
 
 Current verification checkpoint:
 
-- Implements `VXOR`, `VAND`, `VOR`, `VADD`, `VSUB`, `DOT`, `MAC`, `SUM`, `POPCNT`, `XNORDOT`, and `ACC`
+- Implements `VXOR`, `VADD`, `DOT`, `MAC`, and `ACC`
 - Adds one pending command slot per channel for commands issued while `PIM busy` is high
 - Preserves two channels and two banks per channel with two rows per bank for the `1x1` target branch
 - Adds `CONFIG` subops to set/read each channel's automatic refresh reload counter and enable/disable automatic refresh
 - Opcode `0x7` is reserved and sets sticky error
-- Model/example tests: 24 passing
+- Model/example tests: 23 passing
 - Cocotb SPI RTL tests: 11 TinyTapeout-wrapper tests passing
-- Synthesis: 4127 cells, total mapped area 56234.3796, lint-clean
+- Synthesis: 3577 cells, total mapped area 51352.8120, lint-clean
 - Official TinyTapeout area target: `1x1` tile for the reduced-depth feature set
 - Local KLayout/Magic DRC: not yet rerun for this no-STREAM branch
 - Routed standard-cell utilization: not yet measured for this no-STREAM branch

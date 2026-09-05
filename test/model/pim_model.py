@@ -97,32 +97,12 @@ class Channel:
         ]
         return self._pack_lanes(lanes, bits)
 
-    def _vsub(self, a: int, b: int, precision: Precision) -> int:
-        if precision == Precision.INT1:
-            self.sticky_error = True
-            return 0
-        bits = {Precision.INT2: 2, Precision.INT4: 4, Precision.INT8: 8}[precision]
-        lanes = [
-            av - bv
-            for av, bv in zip(self._lane_values(a, precision), self._lane_values(b, precision))
-        ]
-        return self._pack_lanes(lanes, bits)
-
     def _dot(self, a: int, b: int, precision: Precision) -> int:
         total = sum(
             av * bv
             for av, bv in zip(self._lane_values(a, precision), self._lane_values(b, precision))
         )
         return total & ((1 << 18) - 1)
-
-    def _sum(self, value: int, precision: Precision) -> int:
-        return sum(self._lane_values(value, precision)) & ((1 << 18) - 1)
-
-    def _popcnt(self, value: int) -> int:
-        return bin(value & 0xFF).count("1")
-
-    def _xnordot(self, a: int, b: int) -> int:
-        return (2 * self._popcnt(~(a ^ b)) - 8) & ((1 << 18) - 1)
 
     def _acc_byte(self, byte: int) -> int:
         return (self.acc >> (8 * byte)) & 0xFF
@@ -169,20 +149,8 @@ class Channel:
                 dest.rows[dest.active_row] = (
                     bank.rows[bank.active_row] ^ bank_b.rows[bank_b.active_row]
                 ) & 0xFF
-            elif cmd.subop == Vop.AND:
-                dest.rows[dest.active_row] = (
-                    bank.rows[bank.active_row] & bank_b.rows[bank_b.active_row]
-                ) & 0xFF
-            elif cmd.subop == Vop.OR:
-                dest.rows[dest.active_row] = (
-                    bank.rows[bank.active_row] | bank_b.rows[bank_b.active_row]
-                ) & 0xFF
             elif cmd.subop == Vop.ADD and cmd.precision != Precision.INT1:
                 dest.rows[dest.active_row] = self._vadd(
-                    bank.rows[bank.active_row], bank_b.rows[bank_b.active_row], cmd.precision
-                )
-            elif cmd.subop == Vop.SUB and cmd.precision != Precision.INT1:
-                dest.rows[dest.active_row] = self._vsub(
                     bank.rows[bank.active_row], bank_b.rows[bank_b.active_row], cmd.precision
                 )
             else:
@@ -194,21 +162,7 @@ class Channel:
             if not bank.open or not bank_b.open or refreshing or refresh_b:
                 self.sticky_error = True
                 return None
-            if cmd.subop not in (
-                Reduce.DOT,
-                Reduce.MAC,
-                Reduce.SUM,
-                Reduce.POPCNT,
-                Reduce.XNORDOT,
-            ):
-                self.sticky_error = True
-            elif cmd.subop == Reduce.SUM:
-                self.acc = self._sum(bank.rows[bank.active_row], cmd.precision)
-            elif cmd.subop == Reduce.POPCNT and cmd.precision == Precision.INT1:
-                self.acc = self._popcnt(bank.rows[bank.active_row])
-            elif cmd.subop == Reduce.XNORDOT and cmd.precision == Precision.INT1:
-                self.acc = self._xnordot(bank.rows[bank.active_row], bank_b.rows[bank_b.active_row])
-            elif cmd.subop in (Reduce.POPCNT, Reduce.XNORDOT):
+            if cmd.subop not in (Reduce.DOT, Reduce.MAC):
                 self.sticky_error = True
             elif cmd.subop == Reduce.MAC:
                 dot = self._dot(

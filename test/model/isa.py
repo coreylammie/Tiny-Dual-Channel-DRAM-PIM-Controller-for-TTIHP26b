@@ -30,17 +30,17 @@ class Precision(IntEnum):
 class Vop(IntEnum):
     XOR = 0
     ADD = 1
-    AND = 2
-    OR = 3
-    SUB = 4
+    RESERVED_2 = 2
+    RESERVED_3 = 3
+    RESERVED_4 = 4
 
 
 class Reduce(IntEnum):
     DOT = 0
     MAC = 1
-    SUM = 2
-    POPCNT = 3
-    XNORDOT = 4
+    RESERVED_2 = 2
+    RESERVED_3 = 3
+    RESERVED_4 = 4
 
 
 @dataclass(frozen=True)
@@ -155,37 +155,6 @@ def reduce_mac(ch: int, precision: Precision, bank_a: int, bank_b: int) -> Comma
         ch=ch,
         subop=Reduce.MAC,
         precision=precision,
-        bank_a=bank_a,
-        bank_b=bank_b,
-    )
-
-
-def reduce_sum(ch: int, precision: Precision, bank: int) -> Command:
-    return Command(
-        Opcode.REDUCE,
-        ch=ch,
-        subop=Reduce.SUM,
-        precision=precision,
-        bank_a=bank,
-    )
-
-
-def reduce_popcnt(ch: int, bank: int) -> Command:
-    return Command(
-        Opcode.REDUCE,
-        ch=ch,
-        subop=Reduce.POPCNT,
-        precision=Precision.INT1,
-        bank_a=bank,
-    )
-
-
-def reduce_xnordot(ch: int, bank_a: int, bank_b: int) -> Command:
-    return Command(
-        Opcode.REDUCE,
-        ch=ch,
-        subop=Reduce.XNORDOT,
-        precision=Precision.INT1,
         bank_a=bank_a,
         bank_b=bank_b,
     )

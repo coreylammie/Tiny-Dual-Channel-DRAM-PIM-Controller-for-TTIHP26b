@@ -47,15 +47,9 @@ module pim_channel #(
 
   localparam logic [2:0] VOP_XOR = 3'd0;
   localparam logic [2:0] VOP_ADD = 3'd1;
-  localparam logic [2:0] VOP_AND = 3'd2;
-  localparam logic [2:0] VOP_OR  = 3'd3;
-  localparam logic [2:0] VOP_SUB = 3'd4;
 
   localparam logic [2:0] REDUCE_DOT     = 3'd0;
   localparam logic [2:0] REDUCE_MAC     = 3'd1;
-  localparam logic [2:0] REDUCE_SUM     = 3'd2;
-  localparam logic [2:0] REDUCE_POPCNT  = 3'd3;
-  localparam logic [2:0] REDUCE_XNORDOT = 3'd4;
 
   typedef struct packed {
     logic [3:0] op;
@@ -218,72 +212,6 @@ module pim_channel #(
     end
   endfunction
 
-  function automatic logic [7:0] lane_sub_wrap (
-    input logic [7:0] a,
-    input logic [7:0] b,
-    input logic [1:0] precision
-  );
-    logic [7:0] result;
-    int lane;
-    begin
-      result = 8'h00;
-      unique case (precision)
-        PREC_INT2: begin
-          for (lane = 0; lane < 4; lane = lane + 1) begin
-            result[lane * 2 +: 2] = a[lane * 2 +: 2] - b[lane * 2 +: 2];
-          end
-        end
-        PREC_INT4: begin
-          for (lane = 0; lane < 2; lane = lane + 1) begin
-            result[lane * 4 +: 4] = a[lane * 4 +: 4] - b[lane * 4 +: 4];
-          end
-        end
-        PREC_INT8: result = a - b;
-        default:   result = 8'h00;
-      endcase
-      lane_sub_wrap = result;
-    end
-  endfunction
-
-  function automatic logic signed [ACC_WIDTH-1:0] acc_extend_lane (
-    input logic [7:0] value,
-    input logic [1:0] precision,
-    input logic [2:0] lane
-  );
-    logic signed [8:0] lane_value;
-    begin
-      lane_value = sign_extend_lane(value, precision, lane);
-      acc_extend_lane = {{(ACC_WIDTH-9){lane_value[8]}}, lane_value};
-    end
-  endfunction
-
-  function automatic logic signed [ACC_WIDTH-1:0] lane_sum (
-    input logic [7:0] value,
-    input logic [1:0] precision
-  );
-    logic signed [ACC_WIDTH-1:0] total;
-    int lane;
-    begin
-      total = '0;
-      if (precision == PREC_INT1) begin
-        for (lane = 0; lane < 8; lane = lane + 1) begin
-          total = total + {{(ACC_WIDTH-1){1'b0}}, value[lane]};
-        end
-      end else if (precision == PREC_INT2) begin
-        total = acc_extend_lane(value, precision, 3'd0);
-        total = total + acc_extend_lane(value, precision, 3'd1);
-        total = total + acc_extend_lane(value, precision, 3'd2);
-        total = total + acc_extend_lane(value, precision, 3'd3);
-      end else if (precision == PREC_INT4) begin
-        total = acc_extend_lane(value, precision, 3'd0);
-        total = total + acc_extend_lane(value, precision, 3'd1);
-      end else begin
-        total = acc_extend_lane(value, precision, 3'd0);
-      end
-      lane_sum = total;
-    end
-  endfunction
-
   function automatic logic [ACC_WIDTH-1:0] popcount8 (
     input logic [7:0] value
   );
@@ -295,22 +223,6 @@ module pim_channel #(
         total = total + {{(ACC_WIDTH-1){1'b0}}, value[bit_i]};
       end
       popcount8 = total;
-    end
-  endfunction
-
-  function automatic logic [ACC_WIDTH-1:0] xnordot8 (
-    input logic [7:0] a,
-    input logic [7:0] b
-  );
-    logic [3:0] match_count;
-    int bit_i;
-    begin
-      match_count = 4'd0;
-      for (bit_i = 0; bit_i < 8; bit_i = bit_i + 1) begin
-        match_count = match_count + {3'd0, ~(a[bit_i] ^ b[bit_i])};
-      end
-      xnordot8 = ({{(ACC_WIDTH-4){1'b0}}, match_count} << 1) -
-        {{(ACC_WIDTH-4){1'b0}}, 4'd8};
     end
   endfunction
 
@@ -514,16 +426,10 @@ module pim_channel #(
               sticky_error <= 1'b1;
             end else if (
               (exec_uop.subop != VOP_XOR) &&
-              (exec_uop.subop != VOP_ADD) &&
-              (exec_uop.subop != VOP_AND) &&
-              (exec_uop.subop != VOP_OR) &&
-              (exec_uop.subop != VOP_SUB)
+              (exec_uop.subop != VOP_ADD)
             ) begin
               sticky_error <= 1'b1;
-            end else if (
-              ((exec_uop.subop == VOP_ADD) || (exec_uop.subop == VOP_SUB)) &&
-              (exec_uop.precision == PREC_INT1)
-            ) begin
+            end else if ((exec_uop.subop == VOP_ADD) && (exec_uop.precision == PREC_INT1)) begin
               sticky_error <= 1'b1;
             end else begin
               active_is_vop <= 1'b1;
@@ -531,38 +437,20 @@ module pim_channel #(
               active_dest_bank <= exec_uop.dest_bank;
               unique case (exec_uop.subop)
                 VOP_XOR: vop_result <= operand_a ^ operand_b;
-                VOP_AND: vop_result <= operand_a & operand_b;
-                VOP_OR:  vop_result <= operand_a | operand_b;
-                VOP_ADD: vop_result <= lane_add_wrap(operand_a, operand_b, exec_uop.precision);
-                default: vop_result <= lane_sub_wrap(operand_a, operand_b, exec_uop.precision);
+                default: vop_result <= lane_add_wrap(operand_a, operand_b, exec_uop.precision);
               endcase
               pim_busy_ctr <= vop_latency(exec_uop.precision);
             end
           end
           OP_REDUCE: begin
-            // SUM/POPCNT/XNORDOT complete immediately. DOT/MAC enter the
-            // lane-serial busy path above.
+            // DOT/MAC enter the lane-serial busy path above.
             if (!both_operands_ready || either_operand_refreshing) begin
               sticky_error <= 1'b1;
             end else if (
               (exec_uop.subop != REDUCE_DOT) &&
-              (exec_uop.subop != REDUCE_MAC) &&
-              (exec_uop.subop != REDUCE_SUM) &&
-              (exec_uop.subop != REDUCE_POPCNT) &&
-              (exec_uop.subop != REDUCE_XNORDOT)
+              (exec_uop.subop != REDUCE_MAC)
             ) begin
               sticky_error <= 1'b1;
-            end else if (
-              ((exec_uop.subop == REDUCE_POPCNT) || (exec_uop.subop == REDUCE_XNORDOT)) &&
-              (exec_uop.precision != PREC_INT1)
-            ) begin
-              sticky_error <= 1'b1;
-            end else if (exec_uop.subop == REDUCE_SUM) begin
-              acc <= lane_sum(operand_a, exec_uop.precision);
-            end else if (exec_uop.subop == REDUCE_POPCNT) begin
-              acc <= popcount8(operand_a);
-            end else if (exec_uop.subop == REDUCE_XNORDOT) begin
-              acc <= xnordot8(operand_a, operand_b);
             end else begin
               active_is_vop <= 1'b0;
               active_precision <= exec_uop.precision;

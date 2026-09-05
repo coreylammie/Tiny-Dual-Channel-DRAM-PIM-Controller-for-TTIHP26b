@@ -27,16 +27,6 @@ The current RTL starts each PIM operation as an atomic channel operation. Refres
 | VADD | INT2 | 4 |
 | VADD | INT4 | 2 |
 | VADD | INT8 | 1 |
-| VAND/VOR | INT1 | 8 |
-| VAND/VOR | INT2 | 4 |
-| VAND/VOR | INT4 | 2 |
-| VAND/VOR | INT8 | 1 |
-| VSUB | INT2 | 4 |
-| VSUB | INT4 | 2 |
-| VSUB | INT8 | 1 |
-| SUM | INT1/2/4/8 | 1 |
-| POPCNT | INT1 | 1 |
-| XNORDOT | INT1 | 1 |
 | DOT | INT1 | 1 |
 | DOT | INT2 | 4 |
 | DOT | INT4 | 2 |

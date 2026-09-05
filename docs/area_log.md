@@ -747,3 +747,22 @@ Decision: straightforward RTL cleanup is not enough to make 1x1 viable. The rema
 - Failure: `[GPL-0301] Utilization 215.355 % exceeds 100%.`
 
 Decision: the area-efficiency refactor reduced official adjusted movable area by 1786.368 um^2 versus the no-STREAM checkpoint, but the design still requires about 2.15x the legal placement area for a 1x1 tile. This confirms that normal RTL cleanup and placement/layout tuning cannot close the remaining gap by themselves.
+
+## 1x1 Target Minimal PU
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Feature change: removed secondary PU operations `VAND`, `VOR`, `VSUB`, `SUM`, `POPCNT`, and `XNORDOT`; their subopcodes are now reserved and set sticky error
+- Preserved geometry: 2 channels x 2 banks/channel x 2 rows/bank x 8 bits/row
+- Preserved PIM operations: `VXOR`, `VADD`, `DOT`, `MAC`, and accumulator byte reads
+- Local model/example tests: 23 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 11 pass, 0 fail
+- Run tag: `1x1-2rows-min-pu-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 3577
+- Sequential cells: 419 `sg13g2_dfrbpq_1`
+- Total mapped area: 51352.8120
+- Sequential area: 20526.3072
+
+Compared with the prior no-STREAM RTL slimming checkpoint, cutting the secondary PU operations saves 550 mapped cells and 4881.5676 mapped area. This is a meaningful reduction but still roughly 51352.8120 / 28941.494 = 1.77x the official 1x1 core area before placement overhead, so further architectural cuts are likely still required unless the official GDS flow reports an unexpectedly better placement picture.
