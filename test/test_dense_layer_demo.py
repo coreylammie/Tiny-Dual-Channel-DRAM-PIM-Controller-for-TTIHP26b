@@ -26,21 +26,17 @@ def test_dense_layer_int4_activation_int2_weight_matches_reference():
     assert result.chunks_per_output == 3
 
 
-def test_dense_layer_int1_activation_int8_weight_promotes_execution_width():
+def test_dense_layer_rejects_int8_execution_width():
     activations = [1, 0, 1, 1, 0]
     weights = [[-3, 7, 2, -1, 5]]
 
-    result = run_dense_layer(
-        activations,
-        weights,
-        isa.Precision.INT1,
-        isa.Precision.INT8,
-    )
-
-    assert result.outputs == reference_dense(activations, weights)
-    assert result.execution_precision == isa.Precision.INT8
-    assert result.lanes_per_row == 1
-    assert result.chunks_per_output == 3
+    with pytest.raises(ValueError, match="execution precision"):
+        run_dense_layer(
+            activations,
+            weights,
+            isa.Precision.INT1,
+            isa.Precision.INT8,
+        )
 
 
 def test_dense_layer_int1_int1_uses_unsigned_bit_dot_density():

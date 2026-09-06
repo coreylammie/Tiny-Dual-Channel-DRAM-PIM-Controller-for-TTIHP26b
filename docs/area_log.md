@@ -955,3 +955,23 @@ Decision: reducing retained PU state improved official adjusted movable area by 
 - Sequential area: 16705.1808
 
 Decision: reject this implementation. The shift/add version lowers total cell count by 49 versus the active-bank PU state checkpoint, but the extra staging flops and control increase mapped area by 921.2238 and reintroduce a lint warning. For this small row width, the synthesized single-cycle lane multiplier is cheaper than the extra serial product state.
+
+## 1x1 Target Without INT8 Compute
+
+- Date: 2026-09-06
+- Branch: `1x1-target`
+- Feature change: reserved INT8 for `VADD`, `DOT`, and `MAC`; retained INT1/INT2/INT4 compute precision and kept INT8 `VXOR` as bitwise row XOR
+- Preserved geometry: 2 channels x 2 banks/channel x 2 rows/bank x 8 bits/row
+- Preserved PIM operations: `VXOR`, `VADD`, `DOT`, `MAC`, and accumulator byte reads
+- Preserved compute precision: `DOT` and `MAC` still support INT1/INT2/INT4; `VADD` still supports INT2/INT4
+- Local model/example tests: 24 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 10 pass, 0 fail
+- Run tag: `1x1-drop-int8-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 2243
+- Sequential cells: 303 `sg13g2_dfrbpq_1`
+- Total mapped area: 33846.9138
+- Sequential area: 14843.6064
+
+Compared with the active-bank PU state checkpoint, dropping INT8 compute saves 717 mapped cells and 8279.4852 mapped area while preserving the two-channel, two-bank, near-bank-PU architecture. This is the largest remaining single compute-datapath cut measured so far.

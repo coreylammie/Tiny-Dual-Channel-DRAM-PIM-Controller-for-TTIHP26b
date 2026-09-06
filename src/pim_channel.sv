@@ -162,19 +162,16 @@ module pim_channel #(
     input logic [1:0] precision,
     input logic [1:0] lane
   );
-    logic signed [1:0] lane2;
     logic signed [3:0] lane4;
-    logic signed [7:0] lane8;
     begin
-      // INT2 has four 2-bit lanes, INT4 has two 4-bit lanes, and INT8 has one
-      // whole-row lane. INT1 reductions handle unsigned bits separately.
-      lane2 = value[lane * 2 +: 2];
+      // INT2 has four 2-bit lanes and INT4 has two 4-bit lanes. INT1
+      // reductions handle unsigned bits separately. INT8 compute is reserved
+      // in the area-reduced 1x1 target.
       lane4 = value[lane * 4 +: 4];
-      lane8 = value;
       unique case (precision)
-        PREC_INT2: sign_extend_lane = {{7{lane2[1]}}, lane2};
+        PREC_INT2: sign_extend_lane = {{7{value[(lane * 2) + 1]}}, value[lane * 2 +: 2]};
         PREC_INT4: sign_extend_lane = {{5{lane4[3]}}, lane4};
-        default:   sign_extend_lane = {lane8[7], lane8};
+        default:   sign_extend_lane = 9'sd0;
       endcase
     end
   endfunction
@@ -199,7 +196,6 @@ module pim_channel #(
             result[lane * 4 +: 4] = a[lane * 4 +: 4] + b[lane * 4 +: 4];
           end
         end
-        PREC_INT8: result = a + b;
         default:   result = 8'h00;
       endcase
       lane_add_wrap = result;
@@ -386,7 +382,10 @@ module pim_channel #(
               (exec_uop.subop != VOP_ADD)
             ) begin
               sticky_error <= 1'b1;
-            end else if ((exec_uop.subop == VOP_ADD) && (exec_uop.precision == PREC_INT1)) begin
+            end else if ((exec_uop.subop == VOP_ADD) && (
+              (exec_uop.precision == PREC_INT1) ||
+              (exec_uop.precision == PREC_INT8)
+            )) begin
               sticky_error <= 1'b1;
             end else begin
               unique case (exec_uop.subop)
@@ -406,6 +405,8 @@ module pim_channel #(
               (exec_uop.subop != REDUCE_DOT) &&
               (exec_uop.subop != REDUCE_MAC)
             ) begin
+              sticky_error <= 1'b1;
+            end else if (exec_uop.precision == PREC_INT8) begin
               sticky_error <= 1'b1;
             end else begin
               active_precision <= exec_uop.precision;

@@ -10,7 +10,7 @@ The result is a tiny dual-channel DRAM-PIM controller with real memory-control b
 - **Two independent channels:** each channel has its own control state, fixed-period refresh state, sticky error bit, bank pair, and accumulator.
 - **Banked row store:** each channel contains two banks with two 8-bit rows per bank. `ACT`, `PRE`, `WR`, and `RD` expose a DRAM-like open-row programming model.
 - **Near-bank processing unit:** the PU operates across the selected rows in the two banks. `VXOR` and lane-wise `VADD` are immediate row-transform commands; `DOT` and `MAC` use the multi-cycle accumulator stage.
-- **Variable compute resolution:** each compute command selects how an 8-bit row is interpreted: eight INT1 lanes, four signed INT2 lanes, two signed INT4 lanes, or one signed INT8 lane.
+- **Variable compute resolution:** each compute command selects how an 8-bit row is interpreted: eight INT1 lanes, four signed INT2 lanes, or two signed INT4 lanes. INT8 remains encoded but is reserved for compute in the `1x1` target branch.
 - **Host-driven row sequencing:** multi-row dot products are expressed as explicit `ACT` plus `DOT`/`MAC` commands for each row pair, preserving the operation while avoiding autonomous row-walk control state.
 
 The implementation keeps the visible ISA relatively expressive, but uses a lane-serial DOT/MAC datapath so the design remains small enough to route in the TinyTapeout IHP area budget.
@@ -61,13 +61,13 @@ Current verification checkpoint:
 - Preserves two channels and two banks per channel with two rows per bank for the `1x1` target branch
 - Adds `CONFIG` subops to enable/disable automatic refresh and read back that enable bit
 - Opcode `0x7` is reserved and sets sticky error
-- Model/example tests: 23 passing
+- Model/example tests: 24 passing
 - Cocotb SPI RTL tests: 10 TinyTapeout-wrapper tests passing
-- Synthesis: 2960 cells, total mapped area 42126.3990, lint-clean
+- Synthesis: 2243 cells, total mapped area 33846.9138, lint-clean
 - Official TinyTapeout area target: `1x1` tile for the reduced-depth feature set
 - Local KLayout/Magic DRC: not yet rerun for this no-STREAM branch
 - Routed standard-cell utilization: not yet measured for this no-STREAM branch
-- Decision: the current 1x1 fitting experiment preserves two channels and two banks per channel, keeps variable-precision DOT/MAC, and continues trimming retained PU state.
+- Decision: the current 1x1 fitting experiment preserves two channels and two banks per channel, keeps INT1/INT2/INT4 DOT/MAC, and reserves INT8 compute to reduce PU area.
 
 ## Documentation
 

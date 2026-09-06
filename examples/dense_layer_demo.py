@@ -26,6 +26,11 @@ PRECISION_BITS = {
     isa.Precision.INT4: 4,
     isa.Precision.INT8: 8,
 }
+SUPPORTED_EXECUTION_PRECISIONS = {
+    isa.Precision.INT1,
+    isa.Precision.INT2,
+    isa.Precision.INT4,
+}
 
 
 @dataclass(frozen=True)
@@ -66,8 +71,9 @@ def run_dense_layer(
     """Run a quantized dense layer through the PIM model's DOT/MAC path.
 
     `weights` is indexed as `[output][input]`. INT1 is treated as unsigned
-    0/1 data, matching the RTL DOT semantics. INT2/INT4/INT8 are signed
-    two's-complement lanes.
+    0/1 data, matching the RTL DOT semantics. INT2 and INT4 are signed
+    two's-complement lanes. INT8 is still a declared value range, but it is not
+    a supported hardware execution precision in the area-reduced 1x1 target.
     """
 
     _validate_matrix(activations, weights, bias)
@@ -77,6 +83,8 @@ def run_dense_layer(
 
     pim = TinyPimModel() if model is None else model
     exec_precision = _execution_precision(activation_precision, weight_precision)
+    if exec_precision not in SUPPORTED_EXECUTION_PRECISIONS:
+        raise ValueError("dense layer execution precision must be INT1, INT2, or INT4")
     lanes_per_row = 8 // PRECISION_BITS[exec_precision]
     values_per_chunk = lanes_per_row * ROWS_PER_BANK
     bias_values = [0] * len(weights) if bias is None else list(bias)

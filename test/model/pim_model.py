@@ -86,10 +86,10 @@ class Channel:
         return packed & 0xFF
 
     def _vadd(self, a: int, b: int, precision: Precision) -> int:
-        if precision == Precision.INT1:
+        if precision in (Precision.INT1, Precision.INT8):
             self.sticky_error = True
             return 0
-        bits = {Precision.INT2: 2, Precision.INT4: 4, Precision.INT8: 8}[precision]
+        bits = {Precision.INT2: 2, Precision.INT4: 4}[precision]
         lanes = [
             av + bv
             for av, bv in zip(self._lane_values(a, precision), self._lane_values(b, precision))
@@ -148,7 +148,7 @@ class Channel:
                 dest.rows[dest.active_row] = (
                     bank.rows[bank.active_row] ^ bank_b.rows[bank_b.active_row]
                 ) & 0xFF
-            elif cmd.subop == Vop.ADD and cmd.precision != Precision.INT1:
+            elif cmd.subop == Vop.ADD and cmd.precision in (Precision.INT2, Precision.INT4):
                 dest.rows[dest.active_row] = self._vadd(
                     bank.rows[bank.active_row], bank_b.rows[bank_b.active_row], cmd.precision
                 )
@@ -162,6 +162,8 @@ class Channel:
                 self.sticky_error = True
                 return None
             if cmd.subop not in (Reduce.DOT, Reduce.MAC):
+                self.sticky_error = True
+            elif cmd.precision == Precision.INT8:
                 self.sticky_error = True
             elif cmd.subop == Reduce.MAC:
                 dot = self._dot(

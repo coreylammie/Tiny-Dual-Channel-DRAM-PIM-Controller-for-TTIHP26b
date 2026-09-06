@@ -189,6 +189,23 @@ def test_vadd_int1_is_invalid():
     assert model.channels[1].sticky_error
 
 
+def test_int8_compute_precision_is_reserved():
+    model = TinyPimModel()
+    open_and_write_pair(model, 1, 0x01, 0x01)
+    model.execute(isa.vop(1, isa.Vop.ADD, isa.Precision.INT8, 0, 1, dest_bank=0))
+    assert model.channels[1].sticky_error
+
+    model.execute(isa.abort(1))
+    open_and_write_pair(model, 1, 0x01, 0x01)
+    model.execute(isa.reduce_dot(1, isa.Precision.INT8, 0, 1))
+    assert model.channels[1].sticky_error
+
+    model.execute(isa.abort(1))
+    open_and_write_pair(model, 1, 0x01, 0x01)
+    model.execute(isa.reduce_mac(1, isa.Precision.INT8, 0, 1))
+    assert model.channels[1].sticky_error
+
+
 def test_reserved_secondary_vop_subops_set_sticky_error():
     model = TinyPimModel()
     for subop in (isa.Vop.RESERVED_2, isa.Vop.RESERVED_3, isa.Vop.RESERVED_4):
