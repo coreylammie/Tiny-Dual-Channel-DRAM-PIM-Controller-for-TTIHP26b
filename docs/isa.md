@@ -51,15 +51,15 @@ The reduced `1x1` target geometry implements row values 0 through 1 for `row A`.
 | VOP | 0 | VXOR | INT1/2/4/8 | bitwise XOR writes destination active row |
 | VOP | 1 | VADD | INT2/4 | lane-wise wraparound add writes destination active row |
 | VOP | 2-7 | RESERVED | - | sets sticky error |
-| REDUCE | 0 | DOT | INT1/2/4 | writes 18-bit accumulator |
-| REDUCE | 1 | MAC | INT1/2/4 | accumulates dot product into 18-bit accumulator |
+| REDUCE | 0 | DOT | INT1/2/4 | writes 14-bit accumulator |
+| REDUCE | 1 | MAC | INT1/2/4 | accumulates dot product into 14-bit accumulator |
 | REDUCE | 2-7 | RESERVED | - | sets sticky error |
 
 `DOT.INT1` and `MAC.INT1` treat row bits as unsigned `{0,1}` lanes. `DOT.INT2/4` and `MAC.INT2/4` use signed two's-complement lanes. The RTL computes INT1 as a one-cycle bit-popcount term and computes INT2/4 through one signed lane product per busy cycle. `DOT` clears the accumulator before adding the dot product; `MAC` preserves the existing accumulator and adds into it.
 
 All `REDUCE` operations require both selected banks to be open and not refreshing. Multi-row dot products are host-driven by activating each row pair and issuing `DOT` for the first row pair followed by `MAC` for subsequent row pairs.
 
-`ACC` returns accumulator byte 0, 1, or 2 using `subopcode[1:0]`. `subopcode == 4` clears the accumulator after returning byte 0.
+`ACC` returns accumulator byte 0, byte 1, or zero for byte 2 using `subopcode[1:0]`. Byte 1 contains zero-extended accumulator bits `[13:8]`. `subopcode == 4` clears the accumulator after returning byte 0.
 
 ## Configuration
 

@@ -23,7 +23,7 @@ module pim_channel #(
   localparam int BANKS_PER_CH = 2;
   localparam int ROWS_PER_BANK = 2;
   localparam int ROW_WIDTH = 8;
-  localparam int ACC_WIDTH = 18;
+  localparam int ACC_WIDTH = 14;
   localparam int REF_INTERVAL = 255;
   localparam int REF_CYCLES = 4;
 
@@ -423,8 +423,8 @@ module pim_channel #(
             rsp_valid <= 1'b1;
             unique case (exec_uop.subop[1:0])
               2'd0: rsp_data <= acc[7:0];
-              2'd1: rsp_data <= acc[15:8];
-              default: rsp_data <= {{(8-(ACC_WIDTH-16)){1'b0}}, acc[ACC_WIDTH-1:16]};
+              2'd1: rsp_data <= {{(16-ACC_WIDTH){1'b0}}, acc[ACC_WIDTH-1:8]};
+              default: rsp_data <= 8'h00;
             endcase
             if (exec_uop.subop == 3'd4) begin
               acc <= '0;

@@ -145,8 +145,8 @@ def test_dot_int4_uses_signed_lanes():
     open_and_write_pair(model, 1, 0x8F, 0x21)
     model.execute(isa.reduce_dot(1, isa.Precision.INT4, 0, 1))
     assert model.execute(isa.acc(1, 0)) == 0xEF
-    assert model.execute(isa.acc(1, 1)) == 0xFF
-    assert model.execute(isa.acc(1, 2)) == 0x03
+    assert model.execute(isa.acc(1, 1)) == 0x3F
+    assert model.execute(isa.acc(1, 2)) == 0x00
 
 
 def test_dot_then_mac_sweeps_rows_under_host_control():

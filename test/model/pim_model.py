@@ -9,6 +9,7 @@ ROWS_PER_BANK = 2
 BANKS_PER_CH = 2
 REF_INTERVAL = 255
 REF_CYCLES = 4
+ACC_WIDTH = 14
 
 
 @dataclass
@@ -101,7 +102,7 @@ class Channel:
             av * bv
             for av, bv in zip(self._lane_values(a, precision), self._lane_values(b, precision))
         )
-        return total & ((1 << 18) - 1)
+        return total & ((1 << ACC_WIDTH) - 1)
 
     def _acc_byte(self, byte: int) -> int:
         return (self.acc >> (8 * byte)) & 0xFF
@@ -171,7 +172,7 @@ class Channel:
                     bank_b.rows[bank_b.active_row],
                     cmd.precision,
                 )
-                self.acc = (self.acc + dot) & ((1 << 18) - 1)
+                self.acc = (self.acc + dot) & ((1 << ACC_WIDTH) - 1)
             else:
                 self.acc = self._dot(
                     bank.rows[bank.active_row], bank_b.rows[bank_b.active_row], cmd.precision
