@@ -1010,3 +1010,18 @@ Decision: reserving INT8 compute improved official adjusted movable area by 9239
 - Sequential area: 14451.6960
 
 Compared with the INT8-reserved checkpoint, the 14-bit accumulator saves 133 mapped cells, 8 sequential cells, 1362.6522 mapped area, and 391.9104 sequential area. This is a worthwhile cut because INT1/INT2/INT4 row-dot accumulation still has headroom for the tiny two-row-per-bank target, while the expensive high bits no longer consume flops and adder logic.
+
+## 1x1 Target 14-Bit Accumulator Official GDS Attempt
+
+- Date: 2026-09-06
+- Branch: `1x1-target`
+- Commit: `71a5a18`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 31222.195 um^2
+- GPL movable instances area after pin-density adjustment: 34813.869 um^2
+- GPL utilization: 120.291%
+- Failure: `[GPL-0301] Utilization 120.291 % exceeds 100%.`
+
+Decision: narrowing the accumulators improved official adjusted movable area by 1577.649 um^2 versus the INT8-reserved checkpoint, moving the 1x1 target from 125.742% to 120.291% utilization. The design is still too large for one official TinyTapeout IHP tile, but this cut preserved the dual-channel, dual-bank geometry and INT1/INT2/INT4 near-bank DOT/MAC behavior.
