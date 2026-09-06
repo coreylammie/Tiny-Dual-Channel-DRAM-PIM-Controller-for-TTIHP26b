@@ -975,3 +975,18 @@ Decision: reject this implementation. The shift/add version lowers total cell co
 - Sequential area: 14843.6064
 
 Compared with the active-bank PU state checkpoint, dropping INT8 compute saves 717 mapped cells and 8279.4852 mapped area while preserving the two-channel, two-bank, near-bank-PU architecture. This is the largest remaining single compute-datapath cut measured so far.
+
+## 1x1 Target Without INT8 Compute Official GDS Attempt
+
+- Date: 2026-09-06
+- Branch: `1x1-target`
+- Commit: `e828339`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 32537.635 um^2
+- GPL movable instances area after pin-density adjustment: 36391.518 um^2
+- GPL utilization: 125.742%
+- Failure: `[GPL-0301] Utilization 125.742 % exceeds 100%.`
+
+Decision: reserving INT8 compute improved official adjusted movable area by 9239.977 um^2 versus the active-bank PU state checkpoint, moving the 1x1 target from 157.668% to 125.742% utilization. The branch is still too large for the official 1x1 wrapper, but this cut closes most of the remaining gap without giving up two channels, two banks per channel, or variable-precision near-bank compute.
