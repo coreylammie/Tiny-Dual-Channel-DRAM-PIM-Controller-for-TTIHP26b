@@ -1025,3 +1025,26 @@ Compared with the INT8-reserved checkpoint, the 14-bit accumulator saves 133 map
 - Failure: `[GPL-0301] Utilization 120.291 % exceeds 100%.`
 
 Decision: narrowing the accumulators improved official adjusted movable area by 1577.649 um^2 versus the INT8-reserved checkpoint, moving the 1x1 target from 125.742% to 120.291% utilization. The design is still too large for one official TinyTapeout IHP tile, but this cut preserved the dual-channel, dual-bank geometry and INT1/INT2/INT4 near-bank DOT/MAC behavior.
+
+## 1x1 Target Shared PU
+
+- Date: 2026-09-07
+- Branch: `1x1-target`
+- Feature change: replaced the duplicated per-channel PIM arithmetic datapaths with one shared lane-serial PU multiplexed between channels; per-channel banks, refresh state, sticky error, and 14-bit accumulators remain
+- Preserved geometry: 2 channels x 2 banks/channel x 2 rows/bank x 8 bits/row
+- Preserved PIM operations: `VXOR`, `VADD`, `DOT`, `MAC`, and accumulator byte reads
+- Preserved compute precision: `DOT` and `MAC` still support INT1/INT2/INT4; `VADD` still supports INT2/INT4
+- Behavioral tradeoff: only one multi-cycle PIM operation can execute globally at a time; a PIM command issued while the shared PU is busy is dropped and sets sticky error
+- Local model/example tests: 24 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 10 pass, 0 fail
+- Run tag: `1x1-shared-pu-slim-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 1674
+- Sequential cells: 287 `sg13g2_dfrbpq_1`
+- Total mapped area: 28317.1140
+- Sequential area: 14059.7856
+- Local global-placement run tag: `1x1-shared-pu-slim-gpl`
+- Local standalone global-placement utilization: 49.732% under the local/default floorplan
+
+Compared with the 14-bit-accumulator checkpoint, sharing the PU saves 436 mapped cells, 8 sequential cells, 4167.1476 mapped area, and 391.9104 sequential area. This is the largest remaining structural reduction compatible with preserving two logical channels, two banks per channel, and the INT1/INT2/INT4 near-bank compute ISA.

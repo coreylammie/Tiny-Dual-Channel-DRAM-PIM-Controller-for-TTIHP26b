@@ -7,18 +7,26 @@ module pim_channel #(
   input  logic             rst_n,
   input  logic             cmd_valid,
   input  logic [3:0]       uop_op,
-  input  logic             uop_ch,
   input  logic [2:0]       uop_subop,
-  input  logic [1:0]       uop_precision,
   input  logic             uop_bank_a,
-  input  logic             uop_bank_b,
   input  logic [1:0]       uop_row_a,
-  input  logic [1:0]       uop_row_b,
-  input  logic [2:0]       uop_flags,
   input  logic [7:0]       uop_imm8,
+  input  logic             pim_busy_status,
+  input  logic             pim_error_set,
+  input  logic             pu_row_we,
+  input  logic             pu_row_bank,
+  input  logic [7:0]       pu_row_data,
+  input  logic             pu_acc_we,
+  input  logic [13:0]      pu_acc_data,
   output logic             rsp_valid,
   output logic [7:0]       rsp_data,
-  output logic [7:0]       status
+  output logic [7:0]       status,
+  output logic [1:0]       bank_open,
+  output logic             refresh_busy_o,
+  output logic             refresh_bank_o,
+  output logic [7:0]       bank0_active_data,
+  output logic [7:0]       bank1_active_data,
+  output logic [13:0]      acc_value
 );
   localparam int BANKS_PER_CH = 2;
   localparam int ROWS_PER_BANK = 2;
@@ -40,35 +48,10 @@ module pim_channel #(
   localparam logic [3:0] OP_CONFIG = 4'hb;
   localparam logic [3:0] OP_ABORT  = 4'hc;
 
-  localparam logic [1:0] PREC_INT1 = 2'b00;
-  localparam logic [1:0] PREC_INT2 = 2'b01;
-  localparam logic [1:0] PREC_INT4 = 2'b10;
-  localparam logic [1:0] PREC_INT8 = 2'b11;
-
-  localparam logic [2:0] VOP_XOR = 3'd0;
-  localparam logic [2:0] VOP_ADD = 3'd1;
-
-  localparam logic [2:0] REDUCE_DOT     = 3'd0;
-  localparam logic [2:0] REDUCE_MAC     = 3'd1;
-
-  typedef struct packed {
-    logic [3:0] op;
-    logic [2:0] subop;
-    logic [1:0] precision;
-    logic       bank_a;
-    logic       bank_b;
-    logic [1:0] row_a;
-    logic       dest_bank;
-    logic [7:0] imm8;
-  } pim_uop_t;
-
-  // Minimal row storage: two banks, two addressable rows per bank, 8 bits/row.
   logic [ROW_WIDTH-1:0] rows [BANKS_PER_CH-1:0][ROWS_PER_BANK-1:0];
   logic open [BANKS_PER_CH-1:0];
   logic active_row [BANKS_PER_CH-1:0];
 
-  // Automatic refresh state. A zero counter creates a pending refresh; refresh
-  // starts when no PIM operation is busy. Forced REF bypasses refresh_enable.
   logic [7:0] refresh_ctr;
   logic       refresh_enable;
   logic [2:0] refresh_busy_ctr;
@@ -76,79 +59,33 @@ module pim_channel #(
   logic       refresh_pending;
   logic       refresh_overdue;
   logic       sticky_error;
-
-  // PIM operation state. DOT/MAC use the accumulator and lane-serial
-  // dot-product state below. VOPs update the destination row at decode time.
   logic [ACC_WIDTH-1:0] acc;
-  logic [2:0] pim_busy_ctr;
-  logic [1:0] active_precision;
-  logic       active_bank_a;
-  logic       active_bank_b;
 
-  pim_uop_t incoming_uop;
-  pim_uop_t exec_uop;
-  logic exec_cmd_valid;
-  logic [1:0] dot_lane;
-
-  logic       refresh_busy;
-  logic       pim_busy;
-  logic       target_open;
-  logic       target_refreshing;
+  logic refresh_busy;
+  logic target_open;
+  logic target_refreshing;
   logic target_row;
-  logic       row_invalid;
-  logic       both_operands_ready;
-  logic       either_operand_refreshing;
-  logic [ROW_WIDTH-1:0] operand_a;
-  logic [ROW_WIDTH-1:0] operand_b;
-  logic [ROW_WIDTH-1:0] active_reduce_a;
-  logic [ROW_WIDTH-1:0] active_reduce_b;
-  logic last_dot_lane;
+  logic row_invalid;
 
   assign refresh_busy = (refresh_busy_ctr != 3'd0);
-  assign pim_busy = (pim_busy_ctr != 3'd0);
-  assign exec_cmd_valid = cmd_valid;
-  assign exec_uop = incoming_uop;
+  assign target_open = open[uop_bank_a];
+  assign target_row = active_row[uop_bank_a];
+  assign row_invalid = uop_row_a[1];
+  assign target_refreshing = refresh_busy && (refresh_bank == uop_bank_a);
 
-  always_comb begin
-    incoming_uop.op = uop_op;
-    incoming_uop.subop = uop_subop;
-    incoming_uop.precision = uop_precision;
-    incoming_uop.bank_a = uop_bank_a;
-    incoming_uop.bank_b = uop_bank_b;
-    incoming_uop.row_a = uop_row_a;
-    incoming_uop.dest_bank = uop_flags[0];
-    incoming_uop.imm8 = uop_imm8;
-  end
-  assign target_open = open[exec_uop.bank_a];
-  assign target_row = active_row[exec_uop.bank_a];
-  assign row_invalid = exec_uop.row_a[1];
-  assign target_refreshing = refresh_busy && (refresh_bank == exec_uop.bank_a);
-  assign both_operands_ready = open[exec_uop.bank_a] && open[exec_uop.bank_b];
-  assign either_operand_refreshing =
-    refresh_busy && ((refresh_bank == exec_uop.bank_a) || (refresh_bank == exec_uop.bank_b));
-  assign operand_a = rows[exec_uop.bank_a][active_row[exec_uop.bank_a]];
-  assign operand_b = rows[exec_uop.bank_b][active_row[exec_uop.bank_b]];
-  assign active_reduce_a = rows[active_bank_a][active_row[active_bank_a]];
-  assign active_reduce_b = rows[active_bank_b][active_row[active_bank_b]];
-  assign last_dot_lane = (dot_lane == dot_last_lane(active_precision));
+  assign bank_open = {open[1], open[0]};
+  assign refresh_busy_o = refresh_busy;
+  assign refresh_bank_o = refresh_bank;
+  assign bank0_active_data = rows[0][active_row[0]];
+  assign bank1_active_data = rows[1][active_row[1]];
+  assign acc_value = acc;
 
-  // Some decoded fields are reserved for future ISA growth. Keep them visibly
-  // consumed so lint warnings do not hide real unused signals.
-  wire _unused_stage2_uop = &{
-    1'b0,
-    exec_uop.subop[2],
-    uop_ch,
-    uop_row_b,
-    uop_flags[2:1]
-  };
-
-  // Status bits match README.md/docs/isa.md bit order.
   assign status = {
     sticky_error,
     refresh_overdue,
     refresh_pending,
     refresh_busy,
-    pim_busy,
+    pim_busy_status,
     open[1],
     open[0],
     1'b0
@@ -156,112 +93,6 @@ module pim_channel #(
 
   integer bank_i;
   integer row_i;
-
-  function automatic logic signed [8:0] sign_extend_lane (
-    input logic [7:0] value,
-    input logic [1:0] precision,
-    input logic [1:0] lane
-  );
-    logic signed [3:0] lane4;
-    begin
-      // INT2 has four 2-bit lanes and INT4 has two 4-bit lanes. INT1
-      // reductions handle unsigned bits separately. INT8 compute is reserved
-      // in the area-reduced 1x1 target.
-      lane4 = value[lane * 4 +: 4];
-      unique case (precision)
-        PREC_INT2: sign_extend_lane = {{7{value[(lane * 2) + 1]}}, value[lane * 2 +: 2]};
-        PREC_INT4: sign_extend_lane = {{5{lane4[3]}}, lane4};
-        default:   sign_extend_lane = 9'sd0;
-      endcase
-    end
-  endfunction
-
-  function automatic logic [7:0] lane_add_wrap (
-    input logic [7:0] a,
-    input logic [7:0] b,
-    input logic [1:0] precision
-  );
-    logic [7:0] result;
-    int lane;
-    begin
-      result = 8'h00;
-      unique case (precision)
-        PREC_INT2: begin
-          for (lane = 0; lane < 4; lane = lane + 1) begin
-            result[lane * 2 +: 2] = a[lane * 2 +: 2] + b[lane * 2 +: 2];
-          end
-        end
-        PREC_INT4: begin
-          for (lane = 0; lane < 2; lane = lane + 1) begin
-            result[lane * 4 +: 4] = a[lane * 4 +: 4] + b[lane * 4 +: 4];
-          end
-        end
-        default:   result = 8'h00;
-      endcase
-      lane_add_wrap = result;
-    end
-  endfunction
-
-  function automatic logic [ACC_WIDTH-1:0] popcount8 (
-    input logic [7:0] value
-  );
-    logic [ACC_WIDTH-1:0] total;
-    int bit_i;
-    begin
-      total = '0;
-      for (bit_i = 0; bit_i < 8; bit_i = bit_i + 1) begin
-        total = total + {{(ACC_WIDTH-1){1'b0}}, value[bit_i]};
-      end
-      popcount8 = total;
-    end
-  endfunction
-
-  function automatic logic signed [ACC_WIDTH-1:0] dot_lane_term (
-    input logic [1:0] precision,
-    input logic [7:0] a,
-    input logic [7:0] b,
-    input logic [1:0] lane
-  );
-    logic signed [8:0] lane_a;
-    logic signed [8:0] lane_b;
-    begin
-      if (precision == PREC_INT1) begin
-        // INT1 DOT is a bitwise AND popcount over all eight bit lanes.
-        dot_lane_term = popcount8(a & b);
-      end else begin
-        // Wider precisions add one signed lane product per busy cycle.
-        lane_a = sign_extend_lane(a, precision, lane);
-        lane_b = sign_extend_lane(b, precision, lane);
-        dot_lane_term = lane_a * lane_b;
-      end
-    end
-  endfunction
-
-  function automatic logic [1:0] dot_last_lane (
-    input logic [1:0] precision
-  );
-    begin
-      unique case (precision)
-        PREC_INT2: dot_last_lane = 2'd3;
-        PREC_INT4: dot_last_lane = 2'd1;
-        default:   dot_last_lane = 2'd0;
-      endcase
-    end
-  endfunction
-
-  function automatic logic [2:0] dot_latency (
-    input logic [1:0] precision
-  );
-    begin
-      // Lane-serial compromise: one cycle for INT1/INT8, two cycles for INT4,
-      // and four cycles for INT2.
-      unique case (precision)
-        PREC_INT2: dot_latency = 3'd4;
-        PREC_INT4: dot_latency = 3'd2;
-        default:   dot_latency = 3'd1;
-      endcase
-    end
-  endfunction
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
@@ -280,18 +111,12 @@ module pim_channel #(
       refresh_overdue <= 1'b0;
       sticky_error <= 1'b0;
       acc <= '0;
-      pim_busy_ctr <= 3'd0;
-      active_precision <= PREC_INT1;
-      active_bank_a <= 1'b0;
-      active_bank_b <= 1'b0;
-      dot_lane <= 2'd0;
       rsp_valid <= 1'b0;
       rsp_data <= 8'h00;
     end else begin
       rsp_valid <= 1'b0;
 
       if (refresh_enable) begin
-        // Automatic refresh scheduling is decoupled from forced REF commands.
         if (refresh_ctr == 8'd0) begin
           refresh_ctr <= REF_INTERVAL[7:0] - 8'd1;
           if (refresh_busy || refresh_pending) begin
@@ -306,28 +131,26 @@ module pim_channel #(
 
       if (refresh_busy) begin
         refresh_busy_ctr <= refresh_busy_ctr - 3'd1;
-      end else if (refresh_pending && !pim_busy) begin
-        // Defer autonomous refresh until the atomic PIM datapath is idle.
+      end else if (refresh_pending && !pim_busy_status) begin
         refresh_pending <= 1'b0;
         refresh_busy_ctr <= REF_CYCLES[2:0];
         refresh_bank <= ~refresh_bank;
       end
 
-      if (pim_busy) begin
-        if (cmd_valid) begin
-          sticky_error <= 1'b1;
-        end
-        pim_busy_ctr <= pim_busy_ctr - 3'd1;
-        // DOT/MAC accumulates one lane term each cycle. DOT cleared acc when
-        // it started; MAC leaves the prior accumulator value intact.
-        acc <= acc + dot_lane_term(active_precision, active_reduce_a, active_reduce_b, dot_lane);
-        if (last_dot_lane || (pim_busy_ctr == 3'd1)) begin
-          dot_lane <= 2'd0;
-        end else begin
-          dot_lane <= dot_lane + 2'd1;
-        end
-      end else if (exec_cmd_valid) begin
-        unique case (exec_uop.op)
+      if (pu_row_we) begin
+        rows[pu_row_bank][active_row[pu_row_bank]] <= pu_row_data;
+      end
+      if (pu_acc_we) begin
+        acc <= pu_acc_data;
+      end
+      if (pim_error_set) begin
+        sticky_error <= 1'b1;
+      end
+
+      if (cmd_valid && pim_busy_status && (uop_op != OP_ABORT)) begin
+        sticky_error <= 1'b1;
+      end else if (cmd_valid) begin
+        unique case (uop_op)
           OP_NOP: begin
             rsp_valid <= 1'b1;
             rsp_data <= 8'h00;
@@ -336,22 +159,22 @@ module pim_channel #(
             if (target_refreshing || row_invalid) begin
               sticky_error <= 1'b1;
             end else begin
-              open[exec_uop.bank_a] <= 1'b1;
-              active_row[exec_uop.bank_a] <= exec_uop.row_a[0];
+              open[uop_bank_a] <= 1'b1;
+              active_row[uop_bank_a] <= uop_row_a[0];
             end
           end
           OP_PRE: begin
             if (target_refreshing) begin
               sticky_error <= 1'b1;
             end else begin
-              open[exec_uop.bank_a] <= 1'b0;
+              open[uop_bank_a] <= 1'b0;
             end
           end
           OP_WR: begin
             if (!target_open || target_refreshing) begin
               sticky_error <= 1'b1;
             end else begin
-              rows[exec_uop.bank_a][target_row] <= exec_uop.imm8;
+              rows[uop_bank_a][target_row] <= uop_imm8;
             end
           end
           OP_RD: begin
@@ -360,7 +183,7 @@ module pim_channel #(
               rsp_data <= 8'h00;
               sticky_error <= 1'b1;
             end else begin
-              rsp_data <= rows[exec_uop.bank_a][target_row];
+              rsp_data <= rows[uop_bank_a][target_row];
             end
           end
           OP_REF: begin
@@ -368,65 +191,21 @@ module pim_channel #(
               refresh_overdue <= 1'b1;
             end else begin
               refresh_busy_ctr <= REF_CYCLES[2:0];
-              refresh_bank <= exec_uop.bank_a;
+              refresh_bank <= uop_bank_a;
               refresh_pending <= 1'b0;
             end
           end
-          OP_VOP: begin
-            // VOP operands must both be open and not under refresh. The result
-            // is captured now and written back when pim_busy_ctr expires.
-            if (!both_operands_ready || either_operand_refreshing) begin
-              sticky_error <= 1'b1;
-            end else if (
-              (exec_uop.subop != VOP_XOR) &&
-              (exec_uop.subop != VOP_ADD)
-            ) begin
-              sticky_error <= 1'b1;
-            end else if ((exec_uop.subop == VOP_ADD) && (
-              (exec_uop.precision == PREC_INT1) ||
-              (exec_uop.precision == PREC_INT8)
-            )) begin
-              sticky_error <= 1'b1;
-            end else begin
-              unique case (exec_uop.subop)
-                VOP_XOR: begin
-                  rows[exec_uop.dest_bank][active_row[exec_uop.dest_bank]] <= operand_a ^ operand_b;
-                end
-                default: rows[exec_uop.dest_bank][active_row[exec_uop.dest_bank]] <=
-                  lane_add_wrap(operand_a, operand_b, exec_uop.precision);
-              endcase
-            end
-          end
-          OP_REDUCE: begin
-            // DOT/MAC enter the lane-serial busy path above.
-            if (!both_operands_ready || either_operand_refreshing) begin
-              sticky_error <= 1'b1;
-            end else if (
-              (exec_uop.subop != REDUCE_DOT) &&
-              (exec_uop.subop != REDUCE_MAC)
-            ) begin
-              sticky_error <= 1'b1;
-            end else if (exec_uop.precision == PREC_INT8) begin
-              sticky_error <= 1'b1;
-            end else begin
-              active_precision <= exec_uop.precision;
-              active_bank_a <= exec_uop.bank_a;
-              active_bank_b <= exec_uop.bank_b;
-              dot_lane <= 2'd0;
-              if (exec_uop.subop == REDUCE_DOT) begin
-                acc <= '0;
-              end
-              pim_busy_ctr <= dot_latency(exec_uop.precision);
-            end
+          OP_VOP, OP_REDUCE: begin
+            sticky_error <= 1'b1;
           end
           OP_ACC: begin
             rsp_valid <= 1'b1;
-            unique case (exec_uop.subop[1:0])
+            unique case (uop_subop[1:0])
               2'd0: rsp_data <= acc[7:0];
               2'd1: rsp_data <= {{(16-ACC_WIDTH){1'b0}}, acc[ACC_WIDTH-1:8]};
               default: rsp_data <= 8'h00;
             endcase
-            if (exec_uop.subop == 3'd4) begin
+            if (uop_subop == 3'd4) begin
               acc <= '0;
             end
           end
@@ -435,13 +214,11 @@ module pim_channel #(
             rsp_data <= status;
           end
           OP_CONFIG: begin
-            // CONFIG is intentionally narrow: automatic-refresh enable
-            // write/read only. The refresh interval is fixed for area.
-            unique case (exec_uop.subop)
+            unique case (uop_subop)
               3'd2: begin
-                refresh_enable <= exec_uop.imm8[0];
+                refresh_enable <= uop_imm8[0];
                 refresh_ctr <= REF_INTERVAL[7:0] - 8'd1;
-                if (!exec_uop.imm8[0]) begin
+                if (!uop_imm8[0]) begin
                   refresh_pending <= 1'b0;
                   refresh_overdue <= 1'b0;
                 end
@@ -461,7 +238,6 @@ module pim_channel #(
             refresh_overdue <= 1'b0;
             sticky_error <= 1'b0;
             acc <= '0;
-            pim_busy_ctr <= 3'd0;
           end
           default: begin
             sticky_error <= 1'b1;

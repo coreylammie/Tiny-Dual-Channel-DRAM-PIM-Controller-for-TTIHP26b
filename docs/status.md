@@ -8,15 +8,15 @@ This file is the short public-facing status snapshot. The detailed historical ar
 - Interface: fixed 32-bit SPI command framing with next-frame responses
 - Physical I/O: SPI is implemented on `ui_in[0]`, `ui_in[1]`, `ui_in[2]`, and `uo_out[0]`
 - Memory commands: `ACT`, `PRE`, `WR`, `RD`, `REF`, `STATUS`, `CONFIG`, `ABORT`, and `NOP`
-- PIM operations: `VXOR`, `VADD`, `DOT`, `MAC`, and 14-bit `ACC`; INT8 compute is reserved for area
+- PIM operations: `VXOR`, `VADD`, `DOT`, `MAC`, and 14-bit `ACC`; one shared PU is multiplexed between both channels, and INT8 compute is reserved for area
 - Refresh: per-channel fixed-period automatic refresh with enable control
-- Busy handling: commands issued while the selected channel PIM datapath is busy set sticky error and are dropped
+- Busy handling: PIM commands issued while the shared PU is busy set sticky error and are dropped
 
 ## Local Verification
 
 - Python model/example tests: 24 pass, 0 fail
 - Cocotb TinyTapeout-wrapper RTL tests from `test/`: 10 pass, 0 fail
-- Latest local synthesis checkpoint: 2110 cells, total mapped area 32484.2616, lint-clean
+- Latest local synthesis checkpoint: 1674 cells, total mapped area 28317.1140, lint-clean
 - Latest official TinyTapeout `1x1` GDS check: failed global placement at 120.291% utilization after narrowing accumulators to 14 bits
 - Latest local route/DRC checkpoint: not yet run for this no-STREAM branch
 - Routed standard-cell utilization: not yet measured for this no-STREAM branch

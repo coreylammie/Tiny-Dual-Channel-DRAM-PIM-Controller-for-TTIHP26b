@@ -1,6 +1,6 @@
 # Tiny Dual-Channel DRAM-PIM Controller Architecture
 
-This project is a standard-cell RTL implementation of a tiny dual-channel DRAM-PIM controller featuring lane-serial cross-bank compute, refresh-aware scheduling, and independently concurrent channels under an extreme silicon-area constraint.
+This project is a standard-cell RTL implementation of a tiny dual-channel DRAM-PIM controller featuring shared lane-serial cross-bank compute, refresh-aware memory control, and independently addressable channels under an extreme silicon-area constraint.
 
 ## 64-Bit 1x1 Target Checkpoint
 
@@ -18,9 +18,9 @@ Each bank stores two 8-bit rows, an open-row bit, and a two-bit active-row index
 
 Each channel owns independent refresh state. Channel 0 starts at refresh phase 0 and channel 1 starts at phase 32 to avoid synchronized refresh behavior. The automatic refresh period is fixed at 255 core clocks, and `CONFIG` can enable/disable autonomous refresh scheduling and read back that enable bit. Forced `REF` commands remain available when autonomous refresh is disabled.
 
-Each channel also owns a 14-bit accumulator and a small atomic-operation busy counter. If a command arrives while the channel PIM datapath is busy, the command is dropped and sticky error is set. `ABORT` clears sticky error, refresh state, and any active PIM operation.
+Each channel owns a 14-bit accumulator, while both channels share one lane-serial arithmetic PU. If a PIM command arrives while the shared PU is busy, the command is dropped and sticky error is set. `ABORT` clears the selected channel's sticky error, refresh state, accumulator, and any active PIM operation owned by that channel.
 
-The implemented PIM operations are `VXOR`, `VADD`, `DOT`, and `MAC`, plus accumulator byte reads. `VXOR` and `VADD` are immediate row-transform commands. `DOT` and `MAC` share a lane-serial accumulator datapath: INT1 uses an 8-bit popcount term, while INT2/INT4 add one signed lane product per busy cycle. INT8 compute is reserved in this area-reduced branch. Multi-row dot products are host-driven sequences of `ACT`, `DOT`, and `MAC`; opcode `0x7` and the removed secondary PU subopcodes are reserved.
+The implemented PIM operations are `VXOR`, `VADD`, `DOT`, and `MAC`, plus accumulator byte reads. `VXOR` and `VADD` are immediate row-transform commands issued through the shared PU writeback path. `DOT` and `MAC` share a lane-serial accumulator datapath: INT1 uses an 8-bit popcount term, while INT2/INT4 add one signed lane product per busy cycle. INT8 compute is reserved in this area-reduced branch. Multi-row dot products are host-driven sequences of `ACT`, `DOT`, and `MAC`; opcode `0x7` and the removed secondary PU subopcodes are reserved.
 
 ## TinyTapeout Pins
 
@@ -28,4 +28,4 @@ The implemented PIM operations are `VXOR`, `VADD`, `DOT`, and `MAC`, plus accumu
 
 ## Physical Status
 
-The latest local LibreLane run is route-clean and DRC-clean under the standalone local config and generic fallback SDC. Final TinyTapeout signoff still needs the official submission/precheck environment.
+The latest local LibreLane synthesis checkpoint is lint-clean. Local global placement also passes under the standalone local floorplan, but final TinyTapeout signoff still needs the official submission/precheck environment.
