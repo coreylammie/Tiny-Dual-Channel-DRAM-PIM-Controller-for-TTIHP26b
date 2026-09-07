@@ -403,22 +403,23 @@ module tt_um_tiny_dram_pim (
     .rsp_word(rsp_word)
   );
 
-  // Debug/status pins: MISO plus open/busy indicators for each channel. The
-  // full machine-readable status is available through STATUS commands.
-  assign uo_out = {
-    ena,
-    ch_status[1][4],
-    ch_status[1][2],
-    ch_status[1][1],
-    ch_status[0][4],
-    ch_status[0][2],
-    ch_status[0][1],
-    spi_miso
-  };
+  // Keep only SPI MISO on the output bus. Machine-readable debug/status is
+  // available through STATUS frames, and tying off spare outputs reduces
+  // observable status fanout for the 1x1 placement target.
+  assign uo_out = {7'd0, spi_miso};
   assign uio_out = 8'h00;
   assign uio_oe = 8'h00;
 
-  wire _unused = &{1'b0, uio_in, ui_in[7:3], decoded_row_b, decoded_flags[2:1]};
+  wire _unused = &{
+    1'b0,
+    ena,
+    uio_in,
+    ui_in[7:3],
+    decoded_row_b,
+    decoded_flags[2:1],
+    ch_status[0][4:1],
+    ch_status[1][4:1]
+  };
 endmodule
 
 `default_nettype wire

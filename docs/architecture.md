@@ -24,7 +24,7 @@ The implemented PIM operations are `VXOR`, `VADD`, `DOT`, and `MAC`, plus accumu
 
 ## TinyTapeout Pins
 
-`ui_in[0]` is SPI SCLK, `ui_in[1]` is active-low CS, and `ui_in[2]` is MOSI. `uo_out[0]` is MISO. Remaining output bits expose compact debug status for open banks and refresh-busy state.
+`ui_in[0]` is SPI SCLK, `ui_in[1]` is active-low CS, and `ui_in[2]` is MOSI. `uo_out[0]` is MISO. Remaining output bits are tied low; machine-readable status is available through `STATUS` commands.
 
 ## Physical Status
 

@@ -1063,3 +1063,24 @@ Compared with the 14-bit-accumulator checkpoint, sharing the PU saves 436 mapped
 - Failure: `[GPL-0301] Utilization 106.746 % exceeds 100%.`
 
 Decision: sharing one PU between channels improved official adjusted movable area by 3919.892 um^2 versus the 14-bit-accumulator checkpoint, moving the 1x1 target from 120.291% to 106.746% utilization. This is close enough that the next cut should be a small control/datapath simplification, not a larger feature removal. Do not add a queued PIM command yet; the current design still needs about 1952.483 um^2 of official adjusted placement reduction before there is real margin for backpressure buffering.
+
+## 1x1 Target No Debug Output Pins and Layout Knobs
+
+- Date: 2026-09-07
+- Branch: `1x1-target`
+- Feature change: tied `uo_out[7:1]` low and kept only SPI MISO on `uo_out[0]`; status remains available through SPI `STATUS` frames
+- Config change: mirrored low-risk 1x1 placement knobs into `config.yaml`: 60% placement target density, zero global/detailed placement cell padding, disabled output-port repair buffering, and allowed congested global routing
+- Preserved geometry: 2 channels x 2 banks/channel x 2 rows/bank x 8 bits/row
+- Preserved PIM operations: `VXOR`, `VADD`, `DOT`, `MAC`, and accumulator byte reads
+- Preserved compute precision: `DOT` and `MAC` still support INT1/INT2/INT4; `VADD` still supports INT2/INT4
+- Local model/example tests: 24 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 10 pass, 0 fail
+- Run tags: `1x1-no-debug-uopins-synth`, `1x1-layout-knobs-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 1679
+- Sequential cells: 287 `sg13g2_dfrbpq_1`
+- Total mapped area: 28317.1518
+- Sequential area: 14059.7856
+
+Compared with the shared-PU checkpoint, tying off the debug outputs and adding placement knobs did not reduce mapped logic area; the total mapped area changed by only 0.0378. This is still worth checking in the official TinyTapeout flow because the previous failure included a pin-density area adjustment, but it should not be treated as enough margin for adding a queued PIM buffer.

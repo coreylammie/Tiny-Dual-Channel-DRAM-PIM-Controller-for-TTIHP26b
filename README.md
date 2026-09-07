@@ -60,10 +60,11 @@ Current verification checkpoint:
 - Commands issued while the shared PIM operation is busy set sticky error and are dropped
 - Preserves two channels and two banks per channel with two rows per bank for the `1x1` target branch
 - Adds `CONFIG` subops to enable/disable automatic refresh and read back that enable bit
+- Uses only `uo_out[0]` for SPI MISO; remaining output pins are tied low and status is read over SPI
 - Opcode `0x7` is reserved and sets sticky error
 - Model/example tests: 24 passing
 - Cocotb SPI RTL tests: 10 TinyTapeout-wrapper tests passing
-- Synthesis: 1674 cells, total mapped area 28317.1140, lint-clean
+- Synthesis: 1679 cells, total mapped area 28317.1518, lint-clean
 - Official TinyTapeout area target: `1x1` tile for the reduced-depth feature set
 - Latest official TinyTapeout `1x1` GDS check: failed global placement at 106.746% utilization after sharing one PU between channels
 - Local KLayout/Magic DRC: not yet rerun for this no-STREAM branch
