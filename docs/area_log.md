@@ -1048,3 +1048,18 @@ Decision: narrowing the accumulators improved official adjusted movable area by 
 - Local standalone global-placement utilization: 49.732% under the local/default floorplan
 
 Compared with the 14-bit-accumulator checkpoint, sharing the PU saves 436 mapped cells, 8 sequential cells, 4167.1476 mapped area, and 391.9104 sequential area. This is the largest remaining structural reduction compatible with preserving two logical channels, two banks per channel, and the INT1/INT2/INT4 near-bank compute ISA.
+
+## 1x1 Target Shared PU Official GDS Attempt
+
+- Date: 2026-09-07
+- Branch: `1x1-target`
+- Commit: `596bd06`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 28311.898 um^2
+- GPL movable instances area after pin-density adjustment: 30893.977 um^2
+- GPL utilization: 106.746%
+- Failure: `[GPL-0301] Utilization 106.746 % exceeds 100%.`
+
+Decision: sharing one PU between channels improved official adjusted movable area by 3919.892 um^2 versus the 14-bit-accumulator checkpoint, moving the 1x1 target from 120.291% to 106.746% utilization. This is close enough that the next cut should be a small control/datapath simplification, not a larger feature removal. Do not add a queued PIM command yet; the current design still needs about 1952.483 um^2 of official adjusted placement reduction before there is real margin for backpressure buffering.

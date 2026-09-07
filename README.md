@@ -65,7 +65,7 @@ Current verification checkpoint:
 - Cocotb SPI RTL tests: 10 TinyTapeout-wrapper tests passing
 - Synthesis: 1674 cells, total mapped area 28317.1140, lint-clean
 - Official TinyTapeout area target: `1x1` tile for the reduced-depth feature set
-- Latest official TinyTapeout `1x1` GDS check: failed global placement at 120.291% utilization after narrowing accumulators to 14 bits
+- Latest official TinyTapeout `1x1` GDS check: failed global placement at 106.746% utilization after sharing one PU between channels
 - Local KLayout/Magic DRC: not yet rerun for this no-STREAM branch
 - Routed standard-cell utilization: not yet measured for this no-STREAM branch
 - Decision: the current 1x1 fitting experiment preserves two channels and two banks per channel, keeps INT1/INT2/INT4 DOT/MAC, reserves INT8 compute, narrows each channel accumulator to 14 bits, and shares one PU between both channels to reduce area.
