@@ -1084,3 +1084,19 @@ Decision: sharing one PU between channels improved official adjusted movable are
 - Sequential area: 14059.7856
 
 Compared with the shared-PU checkpoint, tying off the debug outputs and adding placement knobs did not reduce mapped logic area; the total mapped area changed by only 0.0378. This is still worth checking in the official TinyTapeout flow because the previous failure included a pin-density area adjustment, but it should not be treated as enough margin for adding a queued PIM buffer.
+
+## 1x1 Target No Debug Output Pins and Layout Knobs Official GDS Attempt
+
+- Date: 2026-09-07
+- Branch: `1x1-target`
+- Commit: `0c8db3a`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 28340.928 um^2
+- Pin density area adjust: 2488.887 um^2
+- GPL movable instances area after pin-density adjustment: 30829.815 um^2
+- GPL utilization: 106.525%
+- Failure: `[GPL-0301] Utilization 106.525 % exceeds 100%.`
+
+Decision: tying off the spare output pins and mirroring low-risk placement knobs improved official adjusted movable area by only 64.162 um^2 versus the shared-PU checkpoint, moving the 1x1 target from 106.746% to 106.525%. This confirms that placement-only tuning is not enough. The design still needs about 1888.321 um^2 of official adjusted placement reduction before it fits, and more than that before adding a queued PIM buffer would be responsible.

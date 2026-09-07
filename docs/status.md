@@ -17,14 +17,14 @@ This file is the short public-facing status snapshot. The detailed historical ar
 - Python model/example tests: 24 pass, 0 fail
 - Cocotb TinyTapeout-wrapper RTL tests from `test/`: 10 pass, 0 fail
 - Latest local synthesis checkpoint: 1679 cells, total mapped area 28317.1518, lint-clean
-- Latest official TinyTapeout `1x1` GDS check: failed global placement at 106.746% utilization after sharing one PU between channels
+- Latest official TinyTapeout `1x1` GDS check: failed global placement at 106.525% utilization after tying off spare outputs and mirroring placement knobs
 - Latest local route/DRC checkpoint: not yet run for this no-STREAM branch
 - Routed standard-cell utilization: not yet measured for this no-STREAM branch
 - Official TinyTapeout tile setting: `1x1` on the reduced-depth target branch
 
 ## Remaining External Check
 
-Final TinyTapeout confidence still requires a smaller RTL configuration that passes the official GitHub Actions flow:
+Final TinyTapeout confidence still requires a smaller RTL configuration that passes the official GitHub Actions GDS flow:
 
 - `test` workflow for Ubuntu cocotb regression
 - `gds` workflow for TinyTapeout GDS build, precheck, gate-level test, and viewer generation
