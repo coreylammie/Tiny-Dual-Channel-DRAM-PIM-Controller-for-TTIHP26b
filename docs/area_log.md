@@ -1120,3 +1120,19 @@ Decision: tying off the spare output pins and mirroring low-risk placement knobs
 - Sequential area: 14059.7856
 
 Compared with the no-debug-output-pin checkpoint, removing `VXOR` reduced the mapped cell count by 25 but increased mapped area by 28.6146 because the standard-cell mix changed. This is not a local synthesis-area win, but the official TinyTapeout flow should still be checked once to see whether the lower cell/net count improves the 1x1 placement adjustment.
+
+## 1x1 Target Without VXOR Official GDS Attempt
+
+- Date: 2026-09-07
+- Branch: `1x1-target`
+- Commit: `1cd30c5`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 28106.870 um^2
+- Pin density area adjust: 2527.802 um^2
+- GPL movable instances area after pin-density adjustment: 30634.672 um^2
+- GPL utilization: 105.850%
+- Failure: `[GPL-0301] Utilization 105.850 % exceeds 100%.`
+
+Decision: reserving `VOP` subopcode 0 improved official adjusted movable area by 195.143 um^2 versus the no-debug-output-pin checkpoint, moving the 1x1 target from 106.525% to 105.850%. This is directionally useful but much smaller than the remaining gap: the design still needs about 1693.178 um^2 of official adjusted placement reduction to fit before any margin is available.
