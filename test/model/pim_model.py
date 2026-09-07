@@ -145,11 +145,7 @@ class Channel:
                 self.sticky_error = True
                 return None
             dest = self.banks[cmd.flags & 1]
-            if cmd.subop == Vop.XOR:
-                dest.rows[dest.active_row] = (
-                    bank.rows[bank.active_row] ^ bank_b.rows[bank_b.active_row]
-                ) & 0xFF
-            elif cmd.subop == Vop.ADD and cmd.precision in (Precision.INT2, Precision.INT4):
+            if cmd.subop == Vop.ADD and cmd.precision in (Precision.INT2, Precision.INT4):
                 dest.rows[dest.active_row] = self._vadd(
                     bank.rows[bank.active_row], bank_b.rows[bank_b.active_row], cmd.precision
                 )

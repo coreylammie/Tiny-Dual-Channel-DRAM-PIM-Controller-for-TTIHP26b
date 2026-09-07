@@ -20,7 +20,6 @@ The current RTL starts each PIM operation as an atomic channel operation. Refres
 
 | Operation | Precision | Busy cycles |
 |---|---|---:|
-| VXOR | INT1/2/4/8 | 0 |
 | VADD | INT2/4 | 0 |
 | DOT | INT1 | 1 |
 | DOT | INT2 | 4 |
@@ -28,7 +27,7 @@ The current RTL starts each PIM operation as an atomic channel operation. Refres
 | MAC | INT1 | 1 |
 | MAC | INT2 | 4 |
 | MAC | INT4 | 2 |
-`VXOR` and `VADD` update the destination active row at command decode time. `DOT` and `MAC` use the same lane-serial accumulator datapath. INT1 reduces all eight bit pairs through a popcount term in one busy cycle. INT2 and INT4 add one signed lane product per busy cycle. INT8 `VADD`, `DOT`, and `MAC` are reserved and set sticky error in the area-reduced `1x1` target. `DOT` clears the accumulator at operation start; `MAC` preserves the existing accumulator and adds into it.
+`VADD` updates the destination active row at command decode time. `DOT` and `MAC` use the same lane-serial accumulator datapath. INT1 reduces all eight bit pairs through a popcount term in one busy cycle. INT2 and INT4 add one signed lane product per busy cycle. INT8 `VADD`, `DOT`, and `MAC` are reserved and set sticky error in the area-reduced `1x1` target. `DOT` clears the accumulator at operation start; `MAC` preserves the existing accumulator and adds into it.
 
 Multi-row dot products are host-driven sequences of `ACT`, `DOT`, and `MAC`; there is no autonomous row-walk command in the reduced `1x1` target branch.
 

@@ -28,7 +28,7 @@ class Precision(IntEnum):
 
 
 class Vop(IntEnum):
-    XOR = 0
+    RESERVED_0 = 0
     ADD = 1
     RESERVED_2 = 2
     RESERVED_3 = 3

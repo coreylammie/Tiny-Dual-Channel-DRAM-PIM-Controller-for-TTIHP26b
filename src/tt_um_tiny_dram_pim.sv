@@ -58,7 +58,6 @@ module tt_um_tiny_dram_pim (
   localparam logic [1:0] PREC_INT2 = 2'b01;
   localparam logic [1:0] PREC_INT4 = 2'b10;
   localparam logic [1:0] PREC_INT8 = 2'b11;
-  localparam logic [2:0] VOP_XOR = 3'd0;
   localparam logic [2:0] VOP_ADD = 3'd1;
   localparam logic [2:0] REDUCE_DOT = 3'd0;
   localparam logic [2:0] REDUCE_MAC = 3'd1;
@@ -212,9 +211,8 @@ module tt_um_tiny_dram_pim (
     decoded_refresh_busy && ((decoded_refresh_bank == decoded_bank_a) || (decoded_refresh_bank == decoded_bank_b));
   wire decoded_pim_valid =
     ((decoded_op == OP_VOP) &&
-      (((decoded_subop == VOP_XOR)) ||
-       ((decoded_subop == VOP_ADD) &&
-        ((decoded_precision == PREC_INT2) || (decoded_precision == PREC_INT4))))) ||
+      ((decoded_subop == VOP_ADD) &&
+       ((decoded_precision == PREC_INT2) || (decoded_precision == PREC_INT4)))) ||
     ((decoded_op == OP_REDUCE) &&
       ((decoded_subop == REDUCE_DOT) || (decoded_subop == REDUCE_MAC)) &&
       (decoded_precision != PREC_INT8));
@@ -255,19 +253,11 @@ module tt_um_tiny_dram_pim (
         if (decoded_ch) begin
           pu_row_we[1] = 1'b1;
           pu_row_bank[1] = decoded_flags[0];
-          if (decoded_subop == VOP_XOR) begin
-            pu_row_data[15:8] = decoded_operand_a ^ decoded_operand_b;
-          end else begin
-            pu_row_data[15:8] = lane_add_wrap(decoded_operand_a, decoded_operand_b, decoded_precision);
-          end
+          pu_row_data[15:8] = lane_add_wrap(decoded_operand_a, decoded_operand_b, decoded_precision);
         end else begin
           pu_row_we[0] = 1'b1;
           pu_row_bank[0] = decoded_flags[0];
-          if (decoded_subop == VOP_XOR) begin
-            pu_row_data[7:0] = decoded_operand_a ^ decoded_operand_b;
-          end else begin
-            pu_row_data[7:0] = lane_add_wrap(decoded_operand_a, decoded_operand_b, decoded_precision);
-          end
+          pu_row_data[7:0] = lane_add_wrap(decoded_operand_a, decoded_operand_b, decoded_precision);
         end
       end else begin
         if (decoded_subop == REDUCE_DOT) begin

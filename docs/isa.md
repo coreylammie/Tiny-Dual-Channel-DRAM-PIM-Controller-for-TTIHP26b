@@ -48,7 +48,7 @@ The reduced `1x1` target geometry implements row values 0 through 1 for `row A`.
 
 | Opcode | Subopcode | Mnemonic | Precision | Side effect |
 |---|---:|---|---|---|
-| VOP | 0 | VXOR | INT1/2/4/8 | bitwise XOR writes destination active row |
+| VOP | 0 | RESERVED | - | sets sticky error |
 | VOP | 1 | VADD | INT2/4 | lane-wise wraparound add writes destination active row |
 | VOP | 2-7 | RESERVED | - | sets sticky error |
 | REDUCE | 0 | DOT | INT1/2/4 | writes 14-bit accumulator |

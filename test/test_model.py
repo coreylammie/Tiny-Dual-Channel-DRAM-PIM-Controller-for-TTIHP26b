@@ -102,11 +102,12 @@ def open_and_write_pair(model, ch, a, b):
     model.execute(isa.wr(ch, 1, b))
 
 
-def test_vxor_writes_selected_destination_bank():
+def test_vop_subopcode_zero_is_reserved():
     model = TinyPimModel()
     open_and_write_pair(model, 1, 0xA5, 0x3C)
-    model.execute(isa.vop(1, isa.Vop.XOR, isa.Precision.INT1, 0, 1, dest_bank=0))
-    assert model.execute(isa.rd(1, 0)) == 0x99
+    model.execute(isa.vop(1, isa.Vop.RESERVED_0, isa.Precision.INT1, 0, 1, dest_bank=0))
+    assert model.channels[1].sticky_error
+    assert model.execute(isa.rd(1, 0)) == 0xA5
 
 
 def test_vadd_int2_wraps_each_lane():
@@ -208,7 +209,12 @@ def test_int8_compute_precision_is_reserved():
 
 def test_reserved_secondary_vop_subops_set_sticky_error():
     model = TinyPimModel()
-    for subop in (isa.Vop.RESERVED_2, isa.Vop.RESERVED_3, isa.Vop.RESERVED_4):
+    for subop in (
+        isa.Vop.RESERVED_0,
+        isa.Vop.RESERVED_2,
+        isa.Vop.RESERVED_3,
+        isa.Vop.RESERVED_4,
+    ):
         model.execute(isa.abort(1))
         open_and_write_pair(model, 1, 0xA5, 0x3C)
         model.execute(isa.vop(1, subop, isa.Precision.INT4, 0, 1, dest_bank=0))
