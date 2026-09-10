@@ -7,7 +7,7 @@ The result is a tiny dual-channel DRAM-PIM controller with real memory-control b
 ## High-Level Design
 
 - **Host interface:** a 32-bit SPI command frame enters through the TinyTapeout `ui_in`/`uo_out` pins. Responses are returned on the following SPI frame with status and read data.
-- **Two independent channels:** each channel has its own control state, fixed-period refresh state, sticky error bit, bank pair, and 14-bit accumulator.
+- **Two independent channels:** each channel has its own control state, fixed-period refresh state, sticky error bit, bank pair, and 8-bit accumulator.
 - **Banked row store:** each channel contains two banks with two 8-bit rows per bank. `ACT`, `PRE`, `WR`, and `RD` expose a DRAM-like open-row programming model.
 - **Shared near-bank processing unit:** one PU is multiplexed between the two channels. Experimental `ATTEND`, `DOT`, and `MAC` use the shared multi-cycle lane stage.
 - **Variable compute resolution:** each compute command selects how an 8-bit row is interpreted: eight INT1 lanes, four signed INT2 lanes, or two signed INT4 lanes. INT8 remains encoded but is reserved for compute in the `1x1` target branch.
@@ -64,12 +64,12 @@ Current verification checkpoint:
 - Opcode `0x7` is reserved and sets sticky error
 - Model/example tests: 24 passing
 - Cocotb SPI RTL tests: 11 TinyTapeout-wrapper tests passing
-- Synthesis: 1828 cells, total mapped area 30463.5870, lint-clean on this experimental branch
+- Synthesis: 1665 cells, total mapped area 28541.0034, lint-clean on this experimental branch
 - Official TinyTapeout area target: `1x1` tile for the reduced-depth feature set
 - Latest official TinyTapeout `1x1` GDS check: failed global placement at 105.850% utilization after reserving `VOP` subopcode 0
 - Local KLayout/Magic DRC: not yet rerun for this no-STREAM branch
 - Routed standard-cell utilization: not yet measured for this no-STREAM branch
-- Decision: this attention-focused experiment preserves two channels and two banks per channel, keeps INT1/INT2/INT4 DOT/MAC plus accumulator-fed INT2/INT4 `ATTEND`, reserves INT8 compute and the generic `VADD` slot, narrows each channel accumulator to 14 bits, and shares one PU between both channels to reduce area.
+- Decision: this attention-focused experiment preserves two channels and two banks per channel, keeps INT1/INT2/INT4 DOT/MAC plus accumulator-fed INT2/INT4 `ATTEND`, reserves INT8 compute and the generic `VADD` slot, narrows each channel accumulator to 8 bits, and shares one PU between both channels to reduce area.
 
 ## Documentation
 

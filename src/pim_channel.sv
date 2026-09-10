@@ -17,7 +17,7 @@ module pim_channel #(
   input  logic             pu_row_bank,
   input  logic [7:0]       pu_row_data,
   input  logic             pu_acc_we,
-  input  logic [13:0]      pu_acc_data,
+  input  logic [7:0]       pu_acc_data,
   output logic             rsp_valid,
   output logic [7:0]       rsp_data,
   output logic [7:0]       status,
@@ -26,12 +26,12 @@ module pim_channel #(
   output logic             refresh_bank_o,
   output logic [7:0]       bank0_active_data,
   output logic [7:0]       bank1_active_data,
-  output logic [13:0]      acc_value
+  output logic [7:0]       acc_value
 );
   localparam int BANKS_PER_CH = 2;
   localparam int ROWS_PER_BANK = 2;
   localparam int ROW_WIDTH = 8;
-  localparam int ACC_WIDTH = 14;
+  localparam int ACC_WIDTH = 8;
   localparam int REF_INTERVAL = 255;
   localparam int REF_CYCLES = 4;
 
@@ -202,7 +202,7 @@ module pim_channel #(
             rsp_valid <= 1'b1;
             unique case (uop_subop[1:0])
               2'd0: rsp_data <= acc[7:0];
-              2'd1: rsp_data <= {{(16-ACC_WIDTH){1'b0}}, acc[ACC_WIDTH-1:8]};
+              2'd1: rsp_data <= 8'h00;
               default: rsp_data <= 8'h00;
             endcase
             if (uop_subop == 3'd4) begin

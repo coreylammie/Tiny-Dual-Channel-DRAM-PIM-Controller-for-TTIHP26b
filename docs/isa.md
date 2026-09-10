@@ -52,15 +52,15 @@ The reduced `1x1` target geometry implements row values 0 through 1 for `row A`.
 | VOP | 1 | RESERVED | - | sets sticky error |
 | VOP | 2 | ATTEND | INT2/4 | updates output/state row as `bank B = bank B + bank A * ACC_low`, lane-wise wraparound |
 | VOP | 3-7 | RESERVED | - | sets sticky error |
-| REDUCE | 0 | DOT | INT1/2/4 | writes 14-bit accumulator |
-| REDUCE | 1 | MAC | INT1/2/4 | accumulates dot product into 14-bit accumulator |
+| REDUCE | 0 | DOT | INT1/2/4 | writes 8-bit accumulator |
+| REDUCE | 1 | MAC | INT1/2/4 | accumulates dot product into 8-bit accumulator |
 | REDUCE | 2-7 | RESERVED | - | sets sticky error |
 
 `DOT.INT1` and `MAC.INT1` treat row bits as unsigned `{0,1}` lanes. `DOT.INT2/4`, `MAC.INT2/4`, and `ATTEND.INT2/4` use signed two's-complement lanes. `ATTEND` broadcasts the selected channel accumulator's low INT2/INT4 lane as the score multiplier. The RTL computes INT1 reductions as a one-cycle bit-popcount term and computes INT2/4 reductions and attention updates through one signed lane product per busy cycle. `DOT` clears the selected channel accumulator before adding the dot product; `MAC` preserves the selected channel accumulator and adds into it. Both channels share one arithmetic PU, so only one multi-cycle PIM operation can be active at a time.
 
 All `REDUCE` operations require both selected banks to be open and not refreshing. Multi-row dot products are host-driven by activating each row pair and issuing `DOT` for the first row pair followed by `MAC` for subsequent row pairs.
 
-`ACC` returns accumulator byte 0, byte 1, or zero for byte 2 using `subopcode[1:0]`. Byte 1 contains zero-extended accumulator bits `[13:8]`. `subopcode == 4` clears the accumulator after returning byte 0.
+`ACC` returns accumulator byte 0, or zero for higher byte selections using `subopcode[1:0]`. `subopcode == 4` clears the accumulator after returning byte 0.
 
 ## Configuration
 

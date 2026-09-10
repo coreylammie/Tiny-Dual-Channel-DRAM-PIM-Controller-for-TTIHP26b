@@ -149,7 +149,9 @@ def _run_dot_chunk(
     acc0 = model.execute(isa.acc(ch, 0)) or 0
     acc1 = model.execute(isa.acc(ch, 1)) or 0
     acc2 = model.execute(isa.acc(ch, 2)) or 0
-    return _sign_extend(acc0 | ((acc1 & 0x3F) << 8) | ((acc2 & 0x00) << 16), 14)
+    if acc1 != 0 or acc2 != 0:
+        raise RuntimeError("unexpected nonzero high accumulator byte")
+    return _sign_extend(acc0, 8)
 
 
 def _pack_lanes(values: Sequence[int], precision: isa.Precision) -> int:

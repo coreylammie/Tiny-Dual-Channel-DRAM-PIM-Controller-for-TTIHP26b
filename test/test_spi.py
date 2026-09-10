@@ -65,13 +65,14 @@ async def write_packed_rows(spi, ch, bank, rows):
         await spi.transfer32(isa.wr(ch, bank, value).encode())
 
 
-async def read_acc14(spi, ch):
+async def read_acc8(spi, ch):
     await spi.transfer32(isa.acc(ch, 0).encode())
     acc0_rsp = await spi.transfer32(isa.acc(ch, 1).encode())
     acc1_rsp = await spi.transfer32(isa.acc(ch, 2).encode())
     acc2_rsp = await spi.transfer32(isa.nop().encode())
-    raw = (acc0_rsp & 0xFF) | ((acc1_rsp & 0x3F) << 8) | ((acc2_rsp & 0x00) << 16)
-    return sign_extend(raw, 14)
+    assert (acc1_rsp & 0xFF) == 0
+    assert (acc2_rsp & 0xFF) == 0
+    return sign_extend(acc0_rsp & 0xFF, 8)
 
 
 async def status_response(spi, ch):
@@ -343,7 +344,7 @@ async def spi_dense_layer_mixed_precision_dot_sequence(dut):
             await spi.transfer32(isa.act(ch, 1, row).encode())
             await spi.transfer32(isa.reduce_mac(ch, execution_precision, 0, 1).encode())
             await wait_core_clocks(dut, 8)
-        actual_dot.append(await read_acc14(spi, ch))
+        actual_dot.append(await read_acc8(spi, ch))
 
     actual_dense = [dot + b for dot, b in zip(actual_dot, bias)]
 
@@ -449,14 +450,14 @@ async def spi_dot_and_mac_int4_accumulate_signed_rows(dut):
     await spi.transfer32(isa.act(ch, 1, 1).encode())
     await spi.transfer32(isa.reduce_mac(ch, precision, 0, 1).encode())
     await wait_core_clocks(dut, 8)
-    dot_acc = await read_acc14(spi, ch)
+    dot_acc = await read_acc8(spi, ch)
 
     for row in range(2):
         await spi.transfer32(isa.act(ch, 0, row).encode())
         await spi.transfer32(isa.act(ch, 1, row).encode())
         await spi.transfer32(isa.reduce_mac(ch, precision, 0, 1).encode())
         await wait_core_clocks(dut, 8)
-    mac_acc = await read_acc14(spi, ch)
+    mac_acc = await read_acc8(spi, ch)
 
     assert dot_acc == expected_dot
     assert mac_acc == expected_dot * 2

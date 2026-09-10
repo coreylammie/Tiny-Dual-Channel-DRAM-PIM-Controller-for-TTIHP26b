@@ -11,7 +11,7 @@ module tt_um_tiny_dram_pim (
   input  wire       rst_n
 );
   localparam int NUM_CHANNELS = 2;
-  localparam int ACC_WIDTH = 14;
+  localparam int ACC_WIDTH = 8;
 
   logic cmd_valid;
   logic [31:0] cmd_word;
@@ -38,7 +38,6 @@ module tt_um_tiny_dram_pim (
   logic [ACC_WIDTH-1:0] ch_acc [NUM_CHANNELS-1:0];
 
   logic pu_busy;
-  logic [2:0] pu_busy_ctr;
   logic pu_ch;
   logic [1:0] pu_precision;
   logic pu_bank_a;
@@ -89,23 +88,20 @@ module tt_um_tiny_dram_pim (
   wire pu_busy_ch0 = pu_busy && (pu_ch == 1'b0);
   wire pu_busy_ch1 = pu_busy && (pu_ch == 1'b1);
 
-  function automatic logic signed [8:0] sign_extend_lane (
+  function automatic logic signed [3:0] sign_extend_lane (
     input logic [7:0] value,
     input logic [1:0] precision,
     input logic [1:0] lane
   );
-    logic signed [3:0] lane4;
     begin
-      lane4 = 4'sd0;
       unique case (precision)
         PREC_INT2: begin
-          sign_extend_lane = {{7{value[(lane * 2) + 1]}}, value[lane * 2 +: 2]};
+          sign_extend_lane = {{2{value[(lane * 2) + 1]}}, value[lane * 2 +: 2]};
         end
         PREC_INT4: begin
-          lane4 = value[lane * 4 +: 4];
-          sign_extend_lane = {{5{lane4[3]}}, lane4};
+          sign_extend_lane = value[lane * 4 +: 4];
         end
-        default:   sign_extend_lane = 9'sd0;
+        default:   sign_extend_lane = 4'sd0;
       endcase
     end
   endfunction
@@ -157,8 +153,8 @@ module tt_um_tiny_dram_pim (
     input logic [7:0] b,
     input logic [1:0] lane
   );
-    logic signed [8:0] lane_a;
-    logic signed [8:0] lane_b;
+    logic signed [3:0] lane_a;
+    logic signed [3:0] lane_b;
     begin
       if (precision == PREC_INT1) begin
         dot_lane_term = popcount8(a & b);
@@ -178,18 +174,6 @@ module tt_um_tiny_dram_pim (
         PREC_INT2: dot_last_lane = 2'd3;
         PREC_INT4: dot_last_lane = 2'd1;
         default:   dot_last_lane = 2'd0;
-      endcase
-    end
-  endfunction
-
-  function automatic logic [2:0] dot_latency (
-    input logic [1:0] precision
-  );
-    begin
-      unique case (precision)
-        PREC_INT2: dot_latency = 3'd4;
-        PREC_INT4: dot_latency = 3'd2;
-        default:   dot_latency = 3'd1;
       endcase
     end
   endfunction
@@ -244,7 +228,7 @@ module tt_um_tiny_dram_pim (
 
     if (pu_busy) begin
       if (pu_is_attend) begin
-        if ((pu_lane == dot_last_lane(pu_precision)) || (pu_busy_ctr == 3'd1)) begin
+        if (pu_lane == dot_last_lane(pu_precision)) begin
           if (pu_ch) begin
             pu_row_we[1] = 1'b1;
             pu_row_bank[1] = pu_bank_b;
@@ -296,7 +280,7 @@ module tt_um_tiny_dram_pim (
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-      pu_busy_ctr <= 3'd0;
+      pu_busy <= 1'b0;
       pu_ch <= 1'b0;
       pu_precision <= PREC_INT1;
       pu_bank_a <= 1'b0;
@@ -307,15 +291,15 @@ module tt_um_tiny_dram_pim (
       pu_row_result <= 8'h00;
     end else begin
       if (cmd_valid && (decoded_op == OP_ABORT) && (decoded_ch == pu_ch)) begin
-        pu_busy_ctr <= 3'd0;
+        pu_busy <= 1'b0;
         pu_lane <= 2'd0;
         pu_is_attend <= 1'b0;
       end else if (pu_busy) begin
-        if (pu_is_attend && !((pu_lane == dot_last_lane(pu_precision)) || (pu_busy_ctr == 3'd1))) begin
+        if (pu_is_attend && !(pu_lane == dot_last_lane(pu_precision))) begin
           pu_row_result <= attend_step_result;
         end
-        pu_busy_ctr <= pu_busy_ctr - 3'd1;
-        if ((pu_lane == dot_last_lane(pu_precision)) || (pu_busy_ctr == 3'd1)) begin
+        if (pu_lane == dot_last_lane(pu_precision)) begin
+          pu_busy <= 1'b0;
           pu_lane <= 2'd0;
           pu_is_attend <= 1'b0;
         end else begin
@@ -328,7 +312,7 @@ module tt_um_tiny_dram_pim (
         !decoded_operands_refreshing &&
         decoded_pim_valid
       ) begin
-        pu_busy_ctr <= dot_latency(decoded_precision);
+        pu_busy <= 1'b1;
         pu_ch <= decoded_ch;
         pu_precision <= decoded_precision;
         pu_bank_a <= decoded_bank_a;
@@ -340,8 +324,6 @@ module tt_um_tiny_dram_pim (
       end
     end
   end
-
-  assign pu_busy = (pu_busy_ctr != 3'd0);
 
   // Channel refresh phases are staggered so the two banks do not request
   // autonomous refresh on the same core cycle after reset.
