@@ -274,9 +274,9 @@ async def spi_reserved_secondary_pim_ops_and_opcode_7(dut):
     await spi.transfer32(isa.act(0, 0, 0).encode())
     await spi.transfer32(isa.act(0, 1, 0).encode())
     await spi.transfer32(
-        isa.vop(0, isa.Vop.ADD, isa.Precision.INT8, 0, 1, dest_bank=0).encode()
+        isa.vop(0, isa.Vop.RESERVED_1, isa.Precision.INT4, 0, 1, dest_bank=0).encode()
     )
-    int8_vadd_rsp = await status_response(spi, 0)
+    vop_reserved_one_rsp = await status_response(spi, 0)
 
     await spi.transfer32(isa.abort(0).encode())
     await spi.transfer32(isa.act(0, 0, 0).encode())
@@ -288,7 +288,7 @@ async def spi_reserved_secondary_pim_ops_and_opcode_7(dut):
     assert ((vop_reserved_zero_rsp >> 16) & 0x80) != 0
     assert ((vop_reserved_rsp >> 16) & 0x80) != 0
     assert ((reserved_rsp >> 16) & 0x80) != 0
-    assert ((int8_vadd_rsp >> 16) & 0x80) != 0
+    assert ((vop_reserved_one_rsp >> 16) & 0x80) != 0
     assert ((int8_dot_rsp >> 16) & 0x80) != 0
 
 

@@ -61,7 +61,6 @@ module tt_um_tiny_dram_pim (
   localparam logic [1:0] PREC_INT2 = 2'b01;
   localparam logic [1:0] PREC_INT4 = 2'b10;
   localparam logic [1:0] PREC_INT8 = 2'b11;
-  localparam logic [2:0] VOP_ADD = 3'd1;
   localparam logic [2:0] VOP_ATTEND = 3'd2;
   localparam logic [2:0] REDUCE_DOT = 3'd0;
   localparam logic [2:0] REDUCE_MAC = 3'd1;
@@ -108,32 +107,6 @@ module tt_um_tiny_dram_pim (
         end
         default:   sign_extend_lane = 9'sd0;
       endcase
-    end
-  endfunction
-
-  function automatic logic [7:0] lane_add_wrap (
-    input logic [7:0] a,
-    input logic [7:0] b,
-    input logic [1:0] precision
-  );
-    logic [7:0] result;
-    int lane;
-    begin
-      result = 8'h00;
-      unique case (precision)
-        PREC_INT2: begin
-          for (lane = 0; lane < 4; lane = lane + 1) begin
-            result[lane * 2 +: 2] = a[lane * 2 +: 2] + b[lane * 2 +: 2];
-          end
-        end
-        PREC_INT4: begin
-          for (lane = 0; lane < 2; lane = lane + 1) begin
-            result[lane * 4 +: 4] = a[lane * 4 +: 4] + b[lane * 4 +: 4];
-          end
-        end
-        default: result = 8'h00;
-      endcase
-      lane_add_wrap = result;
     end
   endfunction
 
@@ -234,9 +207,6 @@ module tt_um_tiny_dram_pim (
     end
   endfunction
 
-  wire [7:0] decoded_operand_a =
-    decoded_ch ? (decoded_bank_a ? ch_bank1_data[1] : ch_bank0_data[1]) :
-                 (decoded_bank_a ? ch_bank1_data[0] : ch_bank0_data[0]);
   wire [7:0] decoded_operand_b =
     decoded_ch ? (decoded_bank_b ? ch_bank1_data[1] : ch_bank0_data[1]) :
                  (decoded_bank_b ? ch_bank1_data[0] : ch_bank0_data[0]);
@@ -257,7 +227,8 @@ module tt_um_tiny_dram_pim (
     decoded_refresh_busy && ((decoded_refresh_bank == decoded_bank_a) || (decoded_refresh_bank == decoded_bank_b));
   wire decoded_pim_valid =
     ((decoded_op == OP_VOP) &&
-      (((decoded_subop == VOP_ADD) || (decoded_subop == VOP_ATTEND)) &&
+      ((decoded_subop == VOP_ATTEND) &&
+       (decoded_flags == 3'b000) &&
        ((decoded_precision == PREC_INT2) || (decoded_precision == PREC_INT4)))) ||
     ((decoded_op == OP_REDUCE) &&
       ((decoded_subop == REDUCE_DOT) || (decoded_subop == REDUCE_MAC)) &&
@@ -309,17 +280,7 @@ module tt_um_tiny_dram_pim (
         end else begin
           pu_error_set[0] = 1'b1;
         end
-      end else if (decoded_op == OP_VOP) begin
-        if (decoded_subop == VOP_ADD && decoded_ch) begin
-          pu_row_we[1] = 1'b1;
-          pu_row_bank[1] = decoded_flags[0];
-          pu_row_data[15:8] = lane_add_wrap(decoded_operand_a, decoded_operand_b, decoded_precision);
-        end else if (decoded_subop == VOP_ADD) begin
-          pu_row_we[0] = 1'b1;
-          pu_row_bank[0] = decoded_flags[0];
-          pu_row_data[7:0] = lane_add_wrap(decoded_operand_a, decoded_operand_b, decoded_precision);
-        end
-      end else begin
+      end else if (decoded_op == OP_REDUCE) begin
         if (decoded_subop == REDUCE_DOT) begin
           if (decoded_ch) begin
             pu_acc_we[1] = 1'b1;

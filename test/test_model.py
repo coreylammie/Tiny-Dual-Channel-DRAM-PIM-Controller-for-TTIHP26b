@@ -110,18 +110,12 @@ def test_vop_subopcode_zero_is_reserved():
     assert model.execute(isa.rd(1, 0)) == 0xA5
 
 
-def test_vadd_int2_wraps_each_lane():
+def test_vop_subopcode_one_is_reserved():
     model = TinyPimModel()
     open_and_write_pair(model, 1, 0b01_10_11_00, 0b01_01_01_01)
-    model.execute(isa.vop(1, isa.Vop.ADD, isa.Precision.INT2, 0, 1, dest_bank=0))
-    assert model.execute(isa.rd(1, 0)) == 0b10_11_00_01
-
-
-def test_vadd_int4_wraps_each_lane():
-    model = TinyPimModel()
-    open_and_write_pair(model, 1, 0x7F, 0x11)
-    model.execute(isa.vop(1, isa.Vop.ADD, isa.Precision.INT4, 0, 1, dest_bank=1))
-    assert model.execute(isa.rd(1, 1)) == 0x80
+    model.execute(isa.vop(1, isa.Vop.RESERVED_1, isa.Precision.INT2, 0, 1, dest_bank=0))
+    assert model.channels[1].sticky_error
+    assert model.execute(isa.rd(1, 0)) == 0b01_10_11_00
 
 
 def test_attend_int4_uses_accumulator_score_to_update_state_row():
@@ -203,17 +197,17 @@ def test_reserved_opcode_sets_sticky_error():
     assert model.channels[0].sticky_error
 
 
-def test_vadd_int1_is_invalid():
+def test_attend_int1_is_invalid():
     model = TinyPimModel()
     open_and_write_pair(model, 1, 0x01, 0x01)
-    model.execute(isa.vop(1, isa.Vop.ADD, isa.Precision.INT1, 0, 1, dest_bank=0))
+    model.execute(isa.vop(1, isa.Vop.ATTEND, isa.Precision.INT1, 0, 1, dest_bank=0))
     assert model.channels[1].sticky_error
 
 
 def test_int8_compute_precision_is_reserved():
     model = TinyPimModel()
     open_and_write_pair(model, 1, 0x01, 0x01)
-    model.execute(isa.vop(1, isa.Vop.ADD, isa.Precision.INT8, 0, 1, dest_bank=0))
+    model.execute(isa.vop(1, isa.Vop.ATTEND, isa.Precision.INT8, 0, 1, dest_bank=0))
     assert model.channels[1].sticky_error
 
     model.execute(isa.abort(1))
@@ -231,6 +225,7 @@ def test_reserved_secondary_vop_subops_set_sticky_error():
     model = TinyPimModel()
     for subop in (
         isa.Vop.RESERVED_0,
+        isa.Vop.RESERVED_1,
         isa.Vop.RESERVED_3,
         isa.Vop.RESERVED_4,
     ):

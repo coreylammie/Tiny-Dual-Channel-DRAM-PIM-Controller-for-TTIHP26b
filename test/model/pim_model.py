@@ -86,17 +86,6 @@ class Channel:
             packed |= (value & mask) << (i * bits)
         return packed & 0xFF
 
-    def _vadd(self, a: int, b: int, precision: Precision) -> int:
-        if precision in (Precision.INT1, Precision.INT8):
-            self.sticky_error = True
-            return 0
-        bits = {Precision.INT2: 2, Precision.INT4: 4}[precision]
-        lanes = [
-            av + bv
-            for av, bv in zip(self._lane_values(a, precision), self._lane_values(b, precision))
-        ]
-        return self._pack_lanes(lanes, bits)
-
     def _attend(self, value: int, state: int, precision: Precision) -> int:
         if precision in (Precision.INT1, Precision.INT8):
             self.sticky_error = True
@@ -159,12 +148,7 @@ class Channel:
             if not bank.open or not bank_b.open or refreshing or refresh_b:
                 self.sticky_error = True
                 return None
-            dest = self.banks[cmd.flags & 1]
-            if cmd.subop == Vop.ADD and cmd.precision in (Precision.INT2, Precision.INT4):
-                dest.rows[dest.active_row] = self._vadd(
-                    bank.rows[bank.active_row], bank_b.rows[bank_b.active_row], cmd.precision
-                )
-            elif cmd.subop == Vop.ATTEND and cmd.precision in (Precision.INT2, Precision.INT4):
+            if cmd.subop == Vop.ATTEND and cmd.precision in (Precision.INT2, Precision.INT4):
                 bank_b.rows[bank_b.active_row] = self._attend(
                     bank.rows[bank.active_row],
                     bank_b.rows[bank_b.active_row],
