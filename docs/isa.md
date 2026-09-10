@@ -40,23 +40,23 @@ The reduced `1x1` target geometry implements row values 0 through 1 for `row A`.
 
 ## Precision
 
-`00` is INT1, `01` is INT2, `10` is INT4, and `11` is INT8. The reduced `1x1` target reserves INT8 for compute commands; INT8 `VADD`, `KVUPD`, `DOT`, and `MAC` set sticky error.
+`00` is INT1, `01` is INT2, `10` is INT4, and `11` is INT8. The reduced `1x1` target reserves INT8 for compute commands; INT8 `VADD`, `ATTEND`, `DOT`, and `MAC` set sticky error.
 
 ## PU Suboperations
 
-`VOP` uses the two active rows selected by `bank A` and `bank B`. Both banks must be open and not refreshing. `VADD` uses `flags[0]` as the destination bank. `KVUPD` writes back to the active row in `bank B`.
+`VOP` uses the two active rows selected by `bank A` and `bank B`. Both banks must be open and not refreshing. `VADD` uses `flags[0]` as the destination bank. `ATTEND` writes back to the active row in `bank B`.
 
 | Opcode | Subopcode | Mnemonic | Precision | Side effect |
 |---|---:|---|---|---|
 | VOP | 0 | RESERVED | - | sets sticky error |
 | VOP | 1 | VADD | INT2/4 | lane-wise wraparound add writes destination active row |
-| VOP | 2 | KVUPD | INT2/4 | updates state row as `bank B = bank B + bank A * imm8`, lane-wise wraparound |
+| VOP | 2 | ATTEND | INT2/4 | updates output/state row as `bank B = bank B + bank A * ACC_low`, lane-wise wraparound |
 | VOP | 3-7 | RESERVED | - | sets sticky error |
 | REDUCE | 0 | DOT | INT1/2/4 | writes 14-bit accumulator |
 | REDUCE | 1 | MAC | INT1/2/4 | accumulates dot product into 14-bit accumulator |
 | REDUCE | 2-7 | RESERVED | - | sets sticky error |
 
-`DOT.INT1` and `MAC.INT1` treat row bits as unsigned `{0,1}` lanes. `DOT.INT2/4`, `MAC.INT2/4`, and `KVUPD.INT2/4` use signed two's-complement lanes. `KVUPD` treats `imm8` as a packed row of scalar lanes at the selected precision. The RTL computes INT1 reductions as a one-cycle bit-popcount term and computes INT2/4 reductions through one signed lane product per busy cycle. `DOT` clears the selected channel accumulator before adding the dot product; `MAC` preserves the selected channel accumulator and adds into it. Both channels share one arithmetic PU, so only one multi-cycle PIM operation can be active at a time.
+`DOT.INT1` and `MAC.INT1` treat row bits as unsigned `{0,1}` lanes. `DOT.INT2/4`, `MAC.INT2/4`, and `ATTEND.INT2/4` use signed two's-complement lanes. `ATTEND` broadcasts the selected channel accumulator's low INT2/INT4 lane as the score multiplier. The RTL computes INT1 reductions as a one-cycle bit-popcount term and computes INT2/4 reductions through one signed lane product per busy cycle. `DOT` clears the selected channel accumulator before adding the dot product; `MAC` preserves the selected channel accumulator and adds into it. Both channels share one arithmetic PU, so only one multi-cycle PIM operation can be active at a time.
 
 All `REDUCE` operations require both selected banks to be open and not refreshing. Multi-row dot products are host-driven by activating each row pair and issuing `DOT` for the first row pair followed by `MAC` for subsequent row pairs.
 

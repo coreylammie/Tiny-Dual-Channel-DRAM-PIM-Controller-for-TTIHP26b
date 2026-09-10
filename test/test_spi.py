@@ -352,28 +352,37 @@ async def spi_dense_layer_mixed_precision_dot_sequence(dut):
 
 
 @cocotb.test()
-async def spi_kvupd_int4_updates_state_row(dut):
+async def spi_attend_int4_uses_accumulator_score_to_update_state_row(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset(dut)
     spi = SpiDriver(dut)
 
     ch = 0
     precision = isa.Precision.INT4
+    query_row = pack_lanes([1, 1], precision)
+    key_row = pack_lanes([1, 1], precision)
     value_row = pack_lanes([1, 2], precision)
     state_row = pack_lanes([0, 1], precision)
-    scalar = pack_lanes([2, 2], precision)
     expected_state = pack_lanes([2, 5], precision)
 
     await spi.transfer32(isa.abort(ch).encode())
     await spi.transfer32(isa.config_auto_refresh(ch, False).encode())
+    await write_packed_rows(spi, ch, 0, [query_row, 0])
+    await write_packed_rows(spi, ch, 1, [key_row, 0])
+    await spi.transfer32(isa.act(ch, 0, 0).encode())
+    await spi.transfer32(isa.act(ch, 1, 0).encode())
+    await spi.transfer32(isa.reduce_dot(ch, precision, 0, 1).encode())
+    await wait_core_clocks(dut, 8)
+
     await write_packed_rows(spi, ch, 0, [value_row, 0])
     await write_packed_rows(spi, ch, 1, [state_row, 0])
 
     await spi.transfer32(isa.act(ch, 0, 0).encode())
     await spi.transfer32(isa.act(ch, 1, 0).encode())
     await spi.transfer32(
-        isa.vop(ch, isa.Vop.KVUPD, precision, 0, 1, imm8=scalar).encode()
+        isa.vop(ch, isa.Vop.ATTEND, precision, 0, 1).encode()
     )
+    await wait_core_clocks(dut, 8)
     await spi.transfer32(isa.rd(ch, 1).encode())
     rsp = await spi.transfer32(isa.nop().encode())
 

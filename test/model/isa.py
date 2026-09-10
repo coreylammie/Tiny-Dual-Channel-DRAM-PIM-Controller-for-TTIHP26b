@@ -30,7 +30,7 @@ class Precision(IntEnum):
 class Vop(IntEnum):
     RESERVED_0 = 0
     ADD = 1
-    KVUPD = 2
+    ATTEND = 2
     RESERVED_3 = 3
     RESERVED_4 = 4
 

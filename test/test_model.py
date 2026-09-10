@@ -124,17 +124,20 @@ def test_vadd_int4_wraps_each_lane():
     assert model.execute(isa.rd(1, 1)) == 0x80
 
 
-def test_kvupd_int4_updates_state_row_with_packed_scalar():
+def test_attend_int4_uses_accumulator_score_to_update_state_row():
     model = TinyPimModel()
-    open_and_write_pair(model, 1, 0x21, 0x10)
+    open_and_write_pair(model, 1, 0x11, 0x11)
+    model.execute(isa.reduce_dot(1, isa.Precision.INT4, 0, 1))
+
+    model.execute(isa.wr(1, 0, 0x21))
+    model.execute(isa.wr(1, 1, 0x10))
     model.execute(
         isa.vop(
             1,
-            isa.Vop.KVUPD,
+            isa.Vop.ATTEND,
             isa.Precision.INT4,
             0,
             1,
-            imm8=0x22,
         )
     )
     assert model.execute(isa.rd(1, 1)) == 0x52

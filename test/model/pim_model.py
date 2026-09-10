@@ -97,17 +97,17 @@ class Channel:
         ]
         return self._pack_lanes(lanes, bits)
 
-    def _kvupd(self, value: int, state: int, scalar: int, precision: Precision) -> int:
+    def _attend(self, value: int, state: int, precision: Precision) -> int:
         if precision in (Precision.INT1, Precision.INT8):
             self.sticky_error = True
             return 0
         bits = {Precision.INT2: 2, Precision.INT4: 4}[precision]
+        score_lane = self._sign_extend(self.acc & ((1 << bits) - 1), bits)
         lanes = [
-            state_lane + value_lane * scalar_lane
-            for value_lane, state_lane, scalar_lane in zip(
+            state_lane + value_lane * score_lane
+            for value_lane, state_lane in zip(
                 self._lane_values(value, precision),
                 self._lane_values(state, precision),
-                self._lane_values(scalar, precision),
             )
         ]
         return self._pack_lanes(lanes, bits)
@@ -164,11 +164,10 @@ class Channel:
                 dest.rows[dest.active_row] = self._vadd(
                     bank.rows[bank.active_row], bank_b.rows[bank_b.active_row], cmd.precision
                 )
-            elif cmd.subop == Vop.KVUPD and cmd.precision in (Precision.INT2, Precision.INT4):
-                bank_b.rows[bank_b.active_row] = self._kvupd(
+            elif cmd.subop == Vop.ATTEND and cmd.precision in (Precision.INT2, Precision.INT4):
+                bank_b.rows[bank_b.active_row] = self._attend(
                     bank.rows[bank.active_row],
                     bank_b.rows[bank_b.active_row],
-                    cmd.imm8,
                     cmd.precision,
                 )
             else:
