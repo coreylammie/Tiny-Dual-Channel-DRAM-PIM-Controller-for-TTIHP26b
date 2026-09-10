@@ -30,7 +30,7 @@ class Precision(IntEnum):
 class Vop(IntEnum):
     RESERVED_0 = 0
     ADD = 1
-    RESERVED_2 = 2
+    KVUPD = 2
     RESERVED_3 = 3
     RESERVED_4 = 4
 
@@ -118,6 +118,7 @@ def vop(
     bank_a: int,
     bank_b: int,
     dest_bank: int = 0,
+    imm8: int = 0,
 ) -> Command:
     return Command(
         Opcode.VOP,
@@ -127,6 +128,7 @@ def vop(
         bank_a=bank_a,
         bank_b=bank_b,
         flags=dest_bank & 1,
+        imm8=imm8,
     )
 
 

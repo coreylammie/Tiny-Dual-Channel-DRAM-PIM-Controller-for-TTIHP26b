@@ -124,6 +124,23 @@ def test_vadd_int4_wraps_each_lane():
     assert model.execute(isa.rd(1, 1)) == 0x80
 
 
+def test_kvupd_int4_updates_state_row_with_packed_scalar():
+    model = TinyPimModel()
+    open_and_write_pair(model, 1, 0x21, 0x10)
+    model.execute(
+        isa.vop(
+            1,
+            isa.Vop.KVUPD,
+            isa.Precision.INT4,
+            0,
+            1,
+            imm8=0x22,
+        )
+    )
+    assert model.execute(isa.rd(1, 1)) == 0x52
+    assert model.execute(isa.rd(1, 0)) == 0x21
+
+
 def test_dot_int1_uses_unsigned_bit_semantics():
     model = TinyPimModel()
     open_and_write_pair(model, 1, 0b1010_1111, 0b1111_0001)
@@ -211,7 +228,6 @@ def test_reserved_secondary_vop_subops_set_sticky_error():
     model = TinyPimModel()
     for subop in (
         isa.Vop.RESERVED_0,
-        isa.Vop.RESERVED_2,
         isa.Vop.RESERVED_3,
         isa.Vop.RESERVED_4,
     ):

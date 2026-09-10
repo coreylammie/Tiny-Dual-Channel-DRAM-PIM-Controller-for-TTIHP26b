@@ -97,6 +97,21 @@ class Channel:
         ]
         return self._pack_lanes(lanes, bits)
 
+    def _kvupd(self, value: int, state: int, scalar: int, precision: Precision) -> int:
+        if precision in (Precision.INT1, Precision.INT8):
+            self.sticky_error = True
+            return 0
+        bits = {Precision.INT2: 2, Precision.INT4: 4}[precision]
+        lanes = [
+            state_lane + value_lane * scalar_lane
+            for value_lane, state_lane, scalar_lane in zip(
+                self._lane_values(value, precision),
+                self._lane_values(state, precision),
+                self._lane_values(scalar, precision),
+            )
+        ]
+        return self._pack_lanes(lanes, bits)
+
     def _dot(self, a: int, b: int, precision: Precision) -> int:
         total = sum(
             av * bv
@@ -148,6 +163,13 @@ class Channel:
             if cmd.subop == Vop.ADD and cmd.precision in (Precision.INT2, Precision.INT4):
                 dest.rows[dest.active_row] = self._vadd(
                     bank.rows[bank.active_row], bank_b.rows[bank_b.active_row], cmd.precision
+                )
+            elif cmd.subop == Vop.KVUPD and cmd.precision in (Precision.INT2, Precision.INT4):
+                bank_b.rows[bank_b.active_row] = self._kvupd(
+                    bank.rows[bank.active_row],
+                    bank_b.rows[bank_b.active_row],
+                    cmd.imm8,
+                    cmd.precision,
                 )
             else:
                 self.sticky_error = True

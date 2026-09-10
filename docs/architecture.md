@@ -20,7 +20,7 @@ Each channel owns independent refresh state. Channel 0 starts at refresh phase 0
 
 Each channel owns a 14-bit accumulator, while both channels share one lane-serial arithmetic PU. If a PIM command arrives while the shared PU is busy, the command is dropped and sticky error is set. `ABORT` clears the selected channel's sticky error, refresh state, accumulator, and any active PIM operation owned by that channel.
 
-The implemented PIM operations are `VADD`, `DOT`, and `MAC`, plus accumulator byte reads. `VADD` is an immediate row-transform command issued through the shared PU writeback path. `DOT` and `MAC` share a lane-serial accumulator datapath: INT1 uses an 8-bit popcount term, while INT2/INT4 add one signed lane product per busy cycle. INT8 compute is reserved in this area-reduced branch. Multi-row dot products are host-driven sequences of `ACT`, `DOT`, and `MAC`; opcode `0x7` and the removed secondary PU subopcodes are reserved.
+The implemented PIM operations are `VADD`, experimental `KVUPD`, `DOT`, and `MAC`, plus accumulator byte reads. `VADD` is an immediate row-transform command issued through the shared PU writeback path. `KVUPD` reuses signed lane extraction and multiply-add logic to update the active state row in bank B from a value row in bank A and packed scalar lanes in `imm8`. `DOT` and `MAC` share a lane-serial accumulator datapath: INT1 uses an 8-bit popcount term, while INT2/INT4 add one signed lane product per busy cycle. INT8 compute is reserved in this area-reduced branch. Multi-row dot products and KV/state updates are host-driven sequences of `ACT`, `DOT`/`MAC`, and `KVUPD`; opcode `0x7` and the remaining secondary PU subopcodes are reserved.
 
 ## TinyTapeout Pins
 

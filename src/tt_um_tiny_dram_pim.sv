@@ -44,6 +44,9 @@ module tt_um_tiny_dram_pim (
   logic pu_bank_a;
   logic pu_bank_b;
   logic [1:0] pu_lane;
+  logic pu_is_kvupd;
+  logic [7:0] pu_scalar;
+  logic [7:0] pu_row_result;
   logic [1:0] pu_row_we;
   logic [1:0] pu_row_bank;
   logic [15:0] pu_row_data;
@@ -59,6 +62,7 @@ module tt_um_tiny_dram_pim (
   localparam logic [1:0] PREC_INT4 = 2'b10;
   localparam logic [1:0] PREC_INT8 = 2'b11;
   localparam logic [2:0] VOP_ADD = 3'd1;
+  localparam logic [2:0] VOP_KVUPD = 3'd2;
   localparam logic [2:0] REDUCE_DOT = 3'd0;
   localparam logic [2:0] REDUCE_MAC = 3'd1;
 
@@ -133,6 +137,33 @@ module tt_um_tiny_dram_pim (
     end
   endfunction
 
+  function automatic logic [7:0] lane_madd_step (
+    input logic [7:0] value,
+    input logic [7:0] state,
+    input logic [7:0] scalar,
+    input logic [1:0] precision,
+    input logic [1:0] lane
+  );
+    logic [7:0] result;
+    logic [1:0] product2;
+    logic [3:0] product4;
+    begin
+      result = state;
+      unique case (precision)
+        PREC_INT2: begin
+          product2 = value[lane * 2 +: 2] * scalar[lane * 2 +: 2];
+          result[lane * 2 +: 2] = state[lane * 2 +: 2] + product2;
+        end
+        PREC_INT4: begin
+          product4 = value[lane * 4 +: 4] * scalar[lane * 4 +: 4];
+          result[lane * 4 +: 4] = state[lane * 4 +: 4] + product4;
+        end
+        default: result = state;
+      endcase
+      lane_madd_step = result;
+    end
+  endfunction
+
   function automatic logic [ACC_WIDTH-1:0] popcount8 (
     input logic [7:0] value
   );
@@ -203,6 +234,8 @@ module tt_um_tiny_dram_pim (
     pu_ch ? (pu_bank_b ? ch_bank1_data[1] : ch_bank0_data[1]) :
             (pu_bank_b ? ch_bank1_data[0] : ch_bank0_data[0]);
   wire [ACC_WIDTH-1:0] active_acc = pu_ch ? ch_acc[1] : ch_acc[0];
+  wire [7:0] kvupd_step_result =
+    lane_madd_step(active_operand_a, pu_row_result, pu_scalar, pu_precision, pu_lane);
   wire [1:0] decoded_bank_open = decoded_ch ? ch_bank_open[1] : ch_bank_open[0];
   wire decoded_refresh_busy = decoded_ch ? ch_refresh_busy[1] : ch_refresh_busy[0];
   wire decoded_refresh_bank = decoded_ch ? ch_refresh_bank[1] : ch_refresh_bank[0];
@@ -211,7 +244,7 @@ module tt_um_tiny_dram_pim (
     decoded_refresh_busy && ((decoded_refresh_bank == decoded_bank_a) || (decoded_refresh_bank == decoded_bank_b));
   wire decoded_pim_valid =
     ((decoded_op == OP_VOP) &&
-      ((decoded_subop == VOP_ADD) &&
+      (((decoded_subop == VOP_ADD) || (decoded_subop == VOP_KVUPD)) &&
        ((decoded_precision == PREC_INT2) || (decoded_precision == PREC_INT4)))) ||
     ((decoded_op == OP_REDUCE) &&
       ((decoded_subop == REDUCE_DOT) || (decoded_subop == REDUCE_MAC)) &&
@@ -226,14 +259,28 @@ module tt_um_tiny_dram_pim (
     pu_error_set = 2'b00;
 
     if (pu_busy) begin
-      if (pu_ch) begin
-        pu_acc_we[1] = 1'b1;
-        pu_acc_data[(2*ACC_WIDTH)-1:ACC_WIDTH] =
-          active_acc + dot_lane_term(pu_precision, active_operand_a, active_operand_b, pu_lane);
+      if (pu_is_kvupd) begin
+        if ((pu_lane == dot_last_lane(pu_precision)) || (pu_busy_ctr == 3'd1)) begin
+          if (pu_ch) begin
+            pu_row_we[1] = 1'b1;
+            pu_row_bank[1] = pu_bank_b;
+            pu_row_data[15:8] = kvupd_step_result;
+          end else begin
+            pu_row_we[0] = 1'b1;
+            pu_row_bank[0] = pu_bank_b;
+            pu_row_data[7:0] = kvupd_step_result;
+          end
+        end
       end else begin
-        pu_acc_we[0] = 1'b1;
-        pu_acc_data[ACC_WIDTH-1:0] =
-          active_acc + dot_lane_term(pu_precision, active_operand_a, active_operand_b, pu_lane);
+        if (pu_ch) begin
+          pu_acc_we[1] = 1'b1;
+          pu_acc_data[(2*ACC_WIDTH)-1:ACC_WIDTH] =
+            active_acc + dot_lane_term(pu_precision, active_operand_a, active_operand_b, pu_lane);
+        end else begin
+          pu_acc_we[0] = 1'b1;
+          pu_acc_data[ACC_WIDTH-1:0] =
+            active_acc + dot_lane_term(pu_precision, active_operand_a, active_operand_b, pu_lane);
+        end
       end
       if (cmd_valid && decoded_is_pim) begin
         if (decoded_ch) begin
@@ -250,11 +297,11 @@ module tt_um_tiny_dram_pim (
           pu_error_set[0] = 1'b1;
         end
       end else if (decoded_op == OP_VOP) begin
-        if (decoded_ch) begin
+        if (decoded_subop == VOP_ADD && decoded_ch) begin
           pu_row_we[1] = 1'b1;
           pu_row_bank[1] = decoded_flags[0];
           pu_row_data[15:8] = lane_add_wrap(decoded_operand_a, decoded_operand_b, decoded_precision);
-        end else begin
+        end else if (decoded_subop == VOP_ADD) begin
           pu_row_we[0] = 1'b1;
           pu_row_bank[0] = decoded_flags[0];
           pu_row_data[7:0] = lane_add_wrap(decoded_operand_a, decoded_operand_b, decoded_precision);
@@ -281,20 +328,28 @@ module tt_um_tiny_dram_pim (
       pu_bank_a <= 1'b0;
       pu_bank_b <= 1'b0;
       pu_lane <= 2'd0;
+      pu_is_kvupd <= 1'b0;
+      pu_scalar <= 8'h00;
+      pu_row_result <= 8'h00;
     end else begin
       if (cmd_valid && (decoded_op == OP_ABORT) && (decoded_ch == pu_ch)) begin
         pu_busy_ctr <= 3'd0;
         pu_lane <= 2'd0;
+        pu_is_kvupd <= 1'b0;
       end else if (pu_busy) begin
+        if (pu_is_kvupd && !((pu_lane == dot_last_lane(pu_precision)) || (pu_busy_ctr == 3'd1))) begin
+          pu_row_result <= kvupd_step_result;
+        end
         pu_busy_ctr <= pu_busy_ctr - 3'd1;
         if ((pu_lane == dot_last_lane(pu_precision)) || (pu_busy_ctr == 3'd1)) begin
           pu_lane <= 2'd0;
+          pu_is_kvupd <= 1'b0;
         end else begin
           pu_lane <= pu_lane + 2'd1;
         end
       end else if (
         cmd_valid &&
-        (decoded_op == OP_REDUCE) &&
+        (((decoded_op == OP_REDUCE) || ((decoded_op == OP_VOP) && (decoded_subop == VOP_KVUPD)))) &&
         decoded_operands_ready &&
         !decoded_operands_refreshing &&
         decoded_pim_valid
@@ -305,6 +360,9 @@ module tt_um_tiny_dram_pim (
         pu_bank_a <= decoded_bank_a;
         pu_bank_b <= decoded_bank_b;
         pu_lane <= 2'd0;
+        pu_is_kvupd <= (decoded_op == OP_VOP);
+        pu_scalar <= decoded_imm8;
+        pu_row_result <= decoded_operand_b;
       end
     end
   end
