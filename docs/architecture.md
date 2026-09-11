@@ -28,4 +28,4 @@ The implemented PIM operations are experimental `ATTEND`, `DOT`, and `MAC`, plus
 
 ## Physical Status
 
-The latest local LibreLane synthesis checkpoint is lint-clean. Local global placement also passes under the standalone local floorplan, but final TinyTapeout signoff still needs the official submission/precheck environment.
+The current 1x1 branch passes the official TinyTapeout GDS workflow, including precheck, gate-level test, and viewer generation. The routed design reports 95.304% standard-cell utilization with route DRC 0, Magic DRC 0, LVS 0, antenna violations 0, setup violations 0, and hold violations 0.
