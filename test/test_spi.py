@@ -134,7 +134,7 @@ async def spi_command_while_pim_busy_sets_sticky_error(dut):
     await spi.transfer32(isa.wr(0, 0, 0b1010_1111).encode())
     await spi.transfer32(isa.act(0, 1, 1).encode())
     await spi.transfer32(isa.wr(0, 1, 0b1111_0001).encode())
-    await spi.transfer32(isa.reduce_dot(0, isa.Precision.INT2, 0, 1).encode())
+    await spi.transfer32(isa.reduce_dot(0, isa.Precision.INT4, 0, 1).encode())
 
     await RisingEdge(dut.clk)
     design = user_design(dut)
@@ -267,6 +267,12 @@ async def spi_reserved_secondary_pim_ops_and_opcode_7(dut):
     await spi.transfer32(isa.abort(0).encode())
     await spi.transfer32(isa.act(0, 0, 0).encode())
     await spi.transfer32(isa.act(0, 1, 0).encode())
+    await spi.transfer32(isa.reduce_dot(0, isa.Precision.INT2, 0, 1).encode())
+    int2_dot_rsp = await status_response(spi, 0)
+
+    await spi.transfer32(isa.abort(0).encode())
+    await spi.transfer32(isa.act(0, 0, 0).encode())
+    await spi.transfer32(isa.act(0, 1, 0).encode())
     await spi.transfer32(isa.reduce_dot(0, isa.Precision.INT8, 0, 1).encode())
     int8_dot_rsp = await status_response(spi, 0)
 
@@ -275,6 +281,7 @@ async def spi_reserved_secondary_pim_ops_and_opcode_7(dut):
     assert ((vop_reserved_rsp >> 16) & 0x80) != 0
     assert ((reserved_rsp >> 16) & 0x80) != 0
     assert ((vop_reserved_one_rsp >> 16) & 0x80) != 0
+    assert ((int2_dot_rsp >> 16) & 0x80) != 0
     assert ((int8_dot_rsp >> 16) & 0x80) != 0
 
 

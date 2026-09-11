@@ -57,9 +57,7 @@ module tt_um_tiny_dram_pim (
   localparam logic [3:0] OP_REDUCE = 4'h6;
   localparam logic [3:0] OP_ABORT  = 4'hc;
   localparam logic [1:0] PREC_INT1 = 2'b00;
-  localparam logic [1:0] PREC_INT2 = 2'b01;
   localparam logic [1:0] PREC_INT4 = 2'b10;
-  localparam logic [1:0] PREC_INT8 = 2'b11;
   localparam logic [2:0] VOP_ATTEND = 3'd2;
   localparam logic [2:0] REDUCE_DOT = 3'd0;
   localparam logic [2:0] REDUCE_MAC = 3'd1;
@@ -95,9 +93,6 @@ module tt_um_tiny_dram_pim (
   );
     begin
       unique case (precision)
-        PREC_INT2: begin
-          sign_extend_lane = {{2{value[(lane * 2) + 1]}}, value[lane * 2 +: 2]};
-        end
         PREC_INT4: begin
           sign_extend_lane = value[lane * 4 +: 4];
         end
@@ -114,15 +109,10 @@ module tt_um_tiny_dram_pim (
     input logic [1:0] lane
   );
     logic [7:0] result;
-    logic [1:0] product2;
     logic [3:0] product4;
     begin
       result = state;
       unique case (precision)
-        PREC_INT2: begin
-          product2 = value[lane * 2 +: 2] * scalar[lane * 2 +: 2];
-          result[lane * 2 +: 2] = state[lane * 2 +: 2] + product2;
-        end
         PREC_INT4: begin
           product4 = value[lane * 4 +: 4] * scalar[lane * 4 +: 4];
           result[lane * 4 +: 4] = state[lane * 4 +: 4] + product4;
@@ -171,7 +161,6 @@ module tt_um_tiny_dram_pim (
   );
     begin
       unique case (precision)
-        PREC_INT2: dot_last_lane = 2'd3;
         PREC_INT4: dot_last_lane = 2'd1;
         default:   dot_last_lane = 2'd0;
       endcase
@@ -184,7 +173,6 @@ module tt_um_tiny_dram_pim (
   );
     begin
       unique case (precision)
-        PREC_INT2: acc_score_pack = {4{acc_low[1:0]}};
         PREC_INT4: acc_score_pack = {2{acc_low[3:0]}};
         default:   acc_score_pack = 8'h00;
       endcase
@@ -213,10 +201,10 @@ module tt_um_tiny_dram_pim (
     ((decoded_op == OP_VOP) &&
       ((decoded_subop == VOP_ATTEND) &&
        (decoded_flags == 3'b000) &&
-       ((decoded_precision == PREC_INT2) || (decoded_precision == PREC_INT4)))) ||
+       (decoded_precision == PREC_INT4))) ||
     ((decoded_op == OP_REDUCE) &&
       ((decoded_subop == REDUCE_DOT) || (decoded_subop == REDUCE_MAC)) &&
-      (decoded_precision != PREC_INT8));
+      ((decoded_precision == PREC_INT1) || (decoded_precision == PREC_INT4)));
 
   always_comb begin
     pu_row_we = 2'b00;

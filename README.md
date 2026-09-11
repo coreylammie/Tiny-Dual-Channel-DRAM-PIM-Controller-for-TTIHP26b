@@ -10,10 +10,10 @@ The result is a tiny dual-channel DRAM-PIM controller with real memory-control b
 - **Two independent channels:** each channel has its own control state, forced-refresh state, sticky error bit, bank pair, and 8-bit accumulator.
 - **Banked row store:** each channel contains two banks with two 8-bit rows per bank. `ACT`, `PRE`, `WR`, and `RD` expose a DRAM-like open-row programming model.
 - **Shared near-bank processing unit:** one PU is multiplexed between the two channels. Experimental `ATTEND`, `DOT`, and `MAC` use the shared multi-cycle lane stage.
-- **Variable compute resolution:** each compute command selects how an 8-bit row is interpreted: eight INT1 lanes, four signed INT2 lanes, or two signed INT4 lanes. INT8 remains encoded but is reserved for compute in the `1x1` target branch.
+- **Variable compute resolution:** each compute command selects how an 8-bit row is interpreted: eight INT1 lanes or two signed INT4 lanes. INT2 and INT8 remain encoded but are reserved for compute in the `1x1` target branch.
 - **Host-driven row sequencing:** multi-row dot products and attention updates are expressed as explicit row activations plus PU commands, preserving the compute primitive while avoiding autonomous row-walk control state.
 
-The experimental `ATTEND` operation is intended as a tiny analogue of attention-value accumulation: after `DOT` or `MAC` computes an attention score in `ACC`, `ATTEND` updates `bank_b_active_row = bank_b_active_row + bank_a_active_row * ACC_low`, evaluated through the shared lane stage at INT2 or INT4 precision.
+The experimental `ATTEND` operation is intended as a tiny analogue of attention-value accumulation: after `DOT` or `MAC` computes an attention score in `ACC`, `ATTEND` updates `bank_b_active_row = bank_b_active_row + bank_a_active_row * ACC_low`, evaluated through the shared lane stage at INT4 precision.
 
 ## Quick Start
 
@@ -29,7 +29,7 @@ Run a dense-layer inference demo against the controller model:
 python examples/dense_layer_demo.py
 ```
 
-The demo uses explicit `DOT`/`MAC` row-pair sequencing to compute quantized dense-layer outputs and compares the result with a pure Python reference. Activation and weight precision can be configured independently; mixed-precision layers are executed at the wider lane precision, which preserves arithmetic while reducing packing density to the wider operand's lane count.
+The demo uses explicit `DOT`/`MAC` row-pair sequencing to compute quantized dense-layer outputs and compares the result with a pure Python reference. Activation and weight precision can be configured independently; mixed-precision layers are promoted to the nearest supported execution precision, which preserves arithmetic while reducing packing density to the execution lane count.
 
 Run cocotb RTL tests when cocotb and a simulator are installed:
 
@@ -62,14 +62,14 @@ Current verification checkpoint:
 - Uses explicit host-issued `REF`; `CONFIG` is reserved on this area-focused branch
 - Uses only `uo_out[0]` for SPI MISO; remaining output pins are tied low and status is read over SPI
 - Opcode `0x7` is reserved and sets sticky error
-- Model/example tests: 24 passing
+- Model/example tests: 26 passing
 - Cocotb SPI RTL tests: 11 TinyTapeout-wrapper tests passing
-- Synthesis: 1591 cells, total mapped area 26687.4426, lint-clean on this experimental branch
+- Synthesis: 1514 cells, total mapped area 25579.1844, lint-clean on this experimental branch
 - Official TinyTapeout area target: `1x1` tile for the reduced-depth feature set
-- Latest official TinyTapeout `1x1` GDS check: failed global placement at 105.850% utilization after reserving `VOP` subopcode 0
+- Latest official TinyTapeout `1x1` GDS check: failed detailed placement at 99.622% utilization before reserving INT2 compute
 - Local KLayout/Magic DRC: not yet rerun for this no-STREAM branch
 - Routed standard-cell utilization: not yet measured for this no-STREAM branch
-- Decision: this attention-focused experiment preserves two channels and two banks per channel, keeps INT1/INT2/INT4 DOT/MAC plus accumulator-fed INT2/INT4 `ATTEND`, reserves INT8 compute and the generic `VADD` slot, narrows each channel accumulator to 8 bits, and shares one PU between both channels to reduce area.
+- Decision: this attention-focused experiment preserves two channels and two banks per channel, keeps INT1/INT4 DOT/MAC plus accumulator-fed INT4 `ATTEND`, reserves INT2/INT8 compute and the generic `VADD` slot, narrows each channel accumulator to 8 bits, and shares one PU between both channels to reduce area.
 
 ## Documentation
 

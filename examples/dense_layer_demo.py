@@ -1,9 +1,10 @@
 """Dense-layer inference demo using the Tiny DRAM-PIM controller model.
 
-The hardware DOT command has one precision field, so mixed activation/weight
-precision is emulated by promoting each dot-product chunk to the wider lane
+The hardware DOT command has one precision field. This 1x1-focused RTL branch
+executes DOT/MAC at INT1 or INT4, so mixed activation/weight precision is
+emulated by promoting each dot-product chunk to the nearest supported execution
 precision. This keeps arithmetic exact for the supplied quantized values, but
-the memory packing density follows the wider operand.
+the memory packing density follows the execution precision.
 """
 
 from __future__ import annotations
@@ -28,7 +29,6 @@ PRECISION_BITS = {
 }
 SUPPORTED_EXECUTION_PRECISIONS = {
     isa.Precision.INT1,
-    isa.Precision.INT2,
     isa.Precision.INT4,
 }
 
@@ -72,8 +72,8 @@ def run_dense_layer(
 
     `weights` is indexed as `[output][input]`. INT1 is treated as unsigned
     0/1 data, matching the RTL DOT semantics. INT2 and INT4 are signed
-    two's-complement lanes. INT8 is still a declared value range, but it is not
-    a supported hardware execution precision in the area-reduced 1x1 target.
+    two's-complement declared value ranges. INT2 values are promoted to INT4
+    for execution in the area-reduced 1x1 target.
     """
 
     _validate_matrix(activations, weights, bias)
@@ -84,7 +84,7 @@ def run_dense_layer(
     pim = TinyPimModel() if model is None else model
     exec_precision = _execution_precision(activation_precision, weight_precision)
     if exec_precision not in SUPPORTED_EXECUTION_PRECISIONS:
-        raise ValueError("dense layer execution precision must be INT1, INT2, or INT4")
+        raise ValueError("dense layer execution precision must be INT1 or INT4")
     lanes_per_row = 8 // PRECISION_BITS[exec_precision]
     values_per_chunk = lanes_per_row * ROWS_PER_BANK
     bias_values = [0] * len(weights) if bias is None else list(bias)
@@ -175,7 +175,14 @@ def _execution_precision(
     activation_precision: isa.Precision,
     weight_precision: isa.Precision,
 ) -> isa.Precision:
-    return max(activation_precision, weight_precision, key=lambda precision: PRECISION_BITS[precision])
+    requested = max(
+        activation_precision,
+        weight_precision,
+        key=lambda precision: PRECISION_BITS[precision],
+    )
+    if requested == isa.Precision.INT2:
+        return isa.Precision.INT4
+    return requested
 
 
 def _validate_matrix(

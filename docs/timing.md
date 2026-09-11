@@ -20,15 +20,12 @@ The current RTL starts each PIM operation as an atomic channel operation. Refres
 
 | Operation | Precision | Busy cycles |
 |---|---|---:|
-| ATTEND | INT2 | 4 |
 | ATTEND | INT4 | 2 |
 | DOT | INT1 | 1 |
-| DOT | INT2 | 4 |
 | DOT | INT4 | 2 |
 | MAC | INT1 | 1 |
-| MAC | INT2 | 4 |
 | MAC | INT4 | 2 |
-`ATTEND` reuses the shared lane stage and writes the packed lane result back to bank B after the final lane. `DOT` and `MAC` use the same lane-serial accumulator datapath. INT1 reduces all eight bit pairs through a popcount term in one busy cycle. INT2 and INT4 add one signed lane product per busy cycle. INT8 `ATTEND`, `DOT`, and `MAC` are reserved and set sticky error in the area-reduced `1x1` target. `DOT` clears the accumulator at operation start; `MAC` preserves the existing accumulator and adds into it.
+`ATTEND` reuses the shared lane stage and writes the packed lane result back to bank B after the final lane. `DOT` and `MAC` use the same lane-serial accumulator datapath. INT1 reduces all eight bit pairs through a popcount term in one busy cycle. INT4 adds one signed lane product per busy cycle. INT2 and INT8 `ATTEND`, `DOT`, and `MAC` are reserved and set sticky error in the area-reduced `1x1` target. `DOT` clears the accumulator at operation start; `MAC` preserves the existing accumulator and adds into it.
 
 Multi-row dot products and attention updates are host-driven sequences of `ACT`, `DOT`/`MAC`, and `ATTEND`; there is no autonomous row-walk command in the reduced `1x1` target branch.
 

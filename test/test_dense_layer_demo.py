@@ -57,6 +57,22 @@ def test_dense_layer_int1_int1_uses_unsigned_bit_dot_density():
     assert result.chunks_per_output == 1
 
 
+def test_dense_layer_int2_inputs_promote_to_int4_execution():
+    activations = [1, -2, 0, 1]
+    weights = [[-1, 1, 1, 0]]
+
+    result = run_dense_layer(
+        activations,
+        weights,
+        isa.Precision.INT2,
+        isa.Precision.INT2,
+    )
+
+    assert result.outputs == reference_dense(activations, weights)
+    assert result.execution_precision == isa.Precision.INT4
+    assert result.lanes_per_row == 2
+
+
 def test_dense_layer_rejects_values_outside_declared_precision():
     with pytest.raises(ValueError, match="activation value 0"):
         run_dense_layer([2], [[1]], isa.Precision.INT2, isa.Precision.INT2)

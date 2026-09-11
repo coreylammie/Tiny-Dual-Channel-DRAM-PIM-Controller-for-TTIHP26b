@@ -62,10 +62,10 @@ class Channel:
         return packed & 0xFF
 
     def _attend(self, value: int, state: int, precision: Precision) -> int:
-        if precision in (Precision.INT1, Precision.INT8):
+        if precision != Precision.INT4:
             self.sticky_error = True
             return 0
-        bits = {Precision.INT2: 2, Precision.INT4: 4}[precision]
+        bits = 4
         score_lane = self._sign_extend(self.acc & ((1 << bits) - 1), bits)
         lanes = [
             state_lane + value_lane * score_lane
@@ -140,7 +140,7 @@ class Channel:
                 return None
             if cmd.subop not in (Reduce.DOT, Reduce.MAC):
                 self.sticky_error = True
-            elif cmd.precision == Precision.INT8:
+            elif cmd.precision not in (Precision.INT1, Precision.INT4):
                 self.sticky_error = True
             elif cmd.subop == Reduce.MAC:
                 dot = self._dot(
