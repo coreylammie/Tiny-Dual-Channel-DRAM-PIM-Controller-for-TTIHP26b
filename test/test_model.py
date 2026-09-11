@@ -56,6 +56,7 @@ def test_channels_are_independent():
 def test_refresh_blocks_target_bank_and_sets_error():
     model = TinyPimModel()
     model.execute(isa.act(0, 1, 0))
+    model.execute(isa.ref(0, 1))
     model.execute(isa.wr(0, 1, 0x44))
     assert model.channels[0].sticky_error
 
@@ -68,29 +69,17 @@ def test_abort_clears_refresh_and_error_status():
     assert model.channels[0].status() & 0xF0 == 0
 
 
-def test_fixed_auto_refresh_eventually_sets_refresh_status():
+def test_forced_refresh_sets_refresh_status():
     model = TinyPimModel()
     model.execute(isa.abort(0))
-    for _ in range(256):
-        model.execute(isa.nop())
+    model.execute(isa.ref(0, 1))
     assert model.channels[0].status() & 0x30
 
 
-def test_config_can_disable_auto_refresh_and_rejects_reload_subops():
+def test_config_is_reserved():
     model = TinyPimModel()
     model.execute(isa.abort(0))
-    assert model.execute(isa.config_read_auto_refresh(0)) == 1
     model.execute(isa.config_auto_refresh(0, False))
-    assert model.execute(isa.config_read_auto_refresh(0)) == 0
-    for _ in range(12):
-        model.execute(isa.nop())
-    assert model.channels[0].status() & 0x70 == 0
-    model.execute(isa.config_auto_refresh(0, True))
-    assert model.execute(isa.config_read_auto_refresh(0)) == 1
-    model.execute(isa.Command(isa.Opcode.CONFIG, ch=0, subop=0, imm8=2))
-    assert model.channels[0].sticky_error
-    model.execute(isa.abort(0))
-    model.execute(isa.Command(isa.Opcode.CONFIG, ch=0, subop=1))
     assert model.channels[0].sticky_error
 
 

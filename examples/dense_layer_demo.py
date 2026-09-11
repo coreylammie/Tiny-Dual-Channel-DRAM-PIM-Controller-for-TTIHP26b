@@ -129,7 +129,6 @@ def _run_dot_chunk(
         raise ValueError(f"dot chunk must use between 1 and {ROWS_PER_BANK} rows")
 
     model.execute(isa.abort(ch))
-    model.execute(isa.config_auto_refresh(ch, False))
     for row in range(rows_needed):
         a_row = _pack_lanes(a_values[row * lanes_per_row : (row + 1) * lanes_per_row], precision)
         w_row = _pack_lanes(w_values[row * lanes_per_row : (row + 1) * lanes_per_row], precision)

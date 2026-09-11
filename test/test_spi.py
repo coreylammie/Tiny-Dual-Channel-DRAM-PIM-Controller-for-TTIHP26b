@@ -182,31 +182,16 @@ async def spi_reduce_mac_accumulates_dot(dut):
 
 
 @cocotb.test()
-async def spi_config_auto_refresh_enable_and_reserved_reload(dut):
+async def spi_config_is_reserved(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset(dut)
     spi = SpiDriver(dut)
 
     await spi.transfer32(isa.abort(0).encode())
     await spi.transfer32(isa.config_auto_refresh(0, False).encode())
-    await wait_core_clocks(dut, 12)
-    await spi.transfer32(isa.status(0).encode())
-    disabled_rsp = await spi.transfer32(isa.nop().encode())
+    config_rsp = await status_response(spi, 0)
 
-    await spi.transfer32(isa.config_auto_refresh(0, True).encode())
-    await spi.transfer32(isa.config_read_auto_refresh(0).encode())
-    enable_rsp = await spi.transfer32(isa.nop().encode())
-
-    await spi.transfer32(isa.Command(isa.Opcode.CONFIG, ch=0, subop=0, imm8=2).encode())
-    reload_write_rsp = await status_response(spi, 0)
-    await spi.transfer32(isa.abort(0).encode())
-    await spi.transfer32(isa.Command(isa.Opcode.CONFIG, ch=0, subop=1).encode())
-    reload_read_rsp = await status_response(spi, 0)
-
-    assert ((disabled_rsp >> 16) & 0x40) == 0
-    assert (enable_rsp & 0xFF) == 1
-    assert ((reload_write_rsp >> 16) & 0x80) != 0
-    assert ((reload_read_rsp >> 16) & 0x80) != 0
+    assert ((config_rsp >> 16) & 0x80) != 0
 
 
 @cocotb.test()
@@ -326,7 +311,6 @@ async def spi_dense_layer_mixed_precision_dot_sequence(dut):
     actual_dot = []
     for output_weights in weights:
         await spi.transfer32(isa.abort(ch).encode())
-        await spi.transfer32(isa.config_auto_refresh(ch, False).encode())
         await write_packed_rows(spi, ch, 0, activation_rows)
 
         weight_rows = [
@@ -367,7 +351,6 @@ async def spi_attend_int4_uses_accumulator_score_to_update_state_row(dut):
     expected_state = pack_lanes([2, 5], precision)
 
     await spi.transfer32(isa.abort(ch).encode())
-    await spi.transfer32(isa.config_auto_refresh(ch, False).encode())
     await write_packed_rows(spi, ch, 0, [query_row, 0])
     await write_packed_rows(spi, ch, 1, [key_row, 0])
     await spi.transfer32(isa.act(ch, 0, 0).encode())
@@ -428,7 +411,6 @@ async def spi_dot_and_mac_int4_accumulate_signed_rows(dut):
     )
 
     await spi.transfer32(isa.abort(ch).encode())
-    await spi.transfer32(isa.config_auto_refresh(ch, False).encode())
     await write_packed_rows(
         spi,
         ch,

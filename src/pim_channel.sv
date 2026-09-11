@@ -1,8 +1,6 @@
 `default_nettype none
 
-module pim_channel #(
-  parameter int REF_PHASE = 0
-) (
+module pim_channel (
   input  logic             clk,
   input  logic             rst_n,
   input  logic             cmd_valid,
@@ -32,7 +30,6 @@ module pim_channel #(
   localparam int ROWS_PER_BANK = 2;
   localparam int ROW_WIDTH = 8;
   localparam int ACC_WIDTH = 8;
-  localparam int REF_INTERVAL = 255;
   localparam int REF_CYCLES = 4;
 
   localparam logic [3:0] OP_NOP    = 4'h0;
@@ -45,19 +42,14 @@ module pim_channel #(
   localparam logic [3:0] OP_ACC    = 4'h8;
   localparam logic [3:0] OP_REF    = 4'h9;
   localparam logic [3:0] OP_STATUS = 4'ha;
-  localparam logic [3:0] OP_CONFIG = 4'hb;
   localparam logic [3:0] OP_ABORT  = 4'hc;
 
   logic [ROW_WIDTH-1:0] rows [BANKS_PER_CH-1:0][ROWS_PER_BANK-1:0];
   logic open [BANKS_PER_CH-1:0];
   logic active_row [BANKS_PER_CH-1:0];
 
-  logic [7:0] refresh_ctr;
-  logic       refresh_enable;
   logic [2:0] refresh_busy_ctr;
   logic       refresh_bank;
-  logic       refresh_pending;
-  logic       refresh_overdue;
   logic       sticky_error;
   logic [ACC_WIDTH-1:0] acc;
 
@@ -82,8 +74,7 @@ module pim_channel #(
 
   assign status = {
     sticky_error,
-    refresh_overdue,
-    refresh_pending,
+    2'b00,
     refresh_busy,
     pim_busy_status,
     open[1],
@@ -103,12 +94,8 @@ module pim_channel #(
           rows[bank_i][row_i] <= '0;
         end
       end
-      refresh_ctr <= REF_PHASE[7:0];
-      refresh_enable <= 1'b1;
       refresh_busy_ctr <= 3'd0;
       refresh_bank <= 1'b0;
-      refresh_pending <= 1'b0;
-      refresh_overdue <= 1'b0;
       sticky_error <= 1'b0;
       acc <= '0;
       rsp_valid <= 1'b0;
@@ -116,25 +103,8 @@ module pim_channel #(
     end else begin
       rsp_valid <= 1'b0;
 
-      if (refresh_enable) begin
-        if (refresh_ctr == 8'd0) begin
-          refresh_ctr <= REF_INTERVAL[7:0] - 8'd1;
-          if (refresh_busy || refresh_pending) begin
-            refresh_overdue <= 1'b1;
-          end else begin
-            refresh_pending <= 1'b1;
-          end
-        end else begin
-          refresh_ctr <= refresh_ctr - 8'd1;
-        end
-      end
-
       if (refresh_busy) begin
         refresh_busy_ctr <= refresh_busy_ctr - 3'd1;
-      end else if (refresh_pending && !pim_busy_status) begin
-        refresh_pending <= 1'b0;
-        refresh_busy_ctr <= REF_CYCLES[2:0];
-        refresh_bank <= ~refresh_bank;
       end
 
       if (pu_row_we) begin
@@ -188,11 +158,10 @@ module pim_channel #(
           end
           OP_REF: begin
             if (refresh_busy) begin
-              refresh_overdue <= 1'b1;
+              sticky_error <= 1'b1;
             end else begin
               refresh_busy_ctr <= REF_CYCLES[2:0];
               refresh_bank <= uop_bank_a;
-              refresh_pending <= 1'b0;
             end
           end
           OP_VOP, OP_REDUCE: begin
@@ -213,29 +182,8 @@ module pim_channel #(
             rsp_valid <= 1'b1;
             rsp_data <= status;
           end
-          OP_CONFIG: begin
-            unique case (uop_subop)
-              3'd2: begin
-                refresh_enable <= uop_imm8[0];
-                refresh_ctr <= REF_INTERVAL[7:0] - 8'd1;
-                if (!uop_imm8[0]) begin
-                  refresh_pending <= 1'b0;
-                  refresh_overdue <= 1'b0;
-                end
-              end
-              3'd3: begin
-                rsp_valid <= 1'b1;
-                rsp_data <= {7'd0, refresh_enable};
-              end
-              default: begin
-                sticky_error <= 1'b1;
-              end
-            endcase
-          end
           OP_ABORT: begin
-            refresh_pending <= 1'b0;
             refresh_busy_ctr <= 3'd0;
-            refresh_overdue <= 1'b0;
             sticky_error <= 1'b0;
             acc <= '0;
           end

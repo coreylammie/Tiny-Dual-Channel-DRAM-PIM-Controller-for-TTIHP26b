@@ -35,7 +35,7 @@ The reduced `1x1` target geometry implements row values 0 through 1 for `row A`.
 | 0x8 | ACC | Reads accumulator byte selected by `subopcode[1:0]` |
 | 0x9 | REF | Forces refresh on `bank A` |
 | 0xA | STATUS | Reads channel status |
-| 0xB | CONFIG | Configuration operation selected by `subopcode` |
+| 0xB | CONFIG | Reserved in the 1x1 fitting branch; sets sticky error |
 | 0xC | ABORT | Clears sticky error and refresh state |
 
 ## Precision
@@ -64,13 +64,7 @@ All `REDUCE` operations require both selected banks to be open and not refreshin
 
 ## Configuration
 
-| CONFIG Subopcode | Mnemonic | Response | Behavior |
-|---:|---|---|---|
-| 2 | REF_AUTO_WR | none | sets automatic refresh enable from `imm8[0]` |
-| 3 | REF_AUTO_RD | bit 0 | returns automatic refresh enable |
-| other | RESERVED | none | sets sticky error |
-
-The automatic refresh interval is fixed at 255 core clocks. Reset enables automatic refresh. `REF_AUTO_WR` disables only automatic refresh scheduling; forced `REF` commands still work. Unsupported `CONFIG` subopcodes set sticky error.
+`CONFIG` is reserved in the 1x1 fitting branch and sets sticky error. Refresh is host-driven with explicit `REF` commands.
 
 ## Response Word
 
@@ -97,8 +91,8 @@ For ordinary command acknowledgements without read data, the top level returns:
 | Bit | Meaning |
 |---|---|
 | 7 | sticky error |
-| 6 | refresh overdue |
-| 5 | refresh pending |
+| 6 | reserved, reads zero |
+| 5 | reserved, reads zero |
 | 4 | refresh busy |
 | 3 | PIM busy |
 | 2 | bank 1 open |

@@ -7,7 +7,6 @@ from .isa import Opcode, Command, Precision, Vop, Reduce
 
 ROWS_PER_BANK = 2
 BANKS_PER_CH = 2
-REF_INTERVAL = 255
 REF_CYCLES = 4
 ACC_WIDTH = 8
 
@@ -21,43 +20,19 @@ class Bank:
 
 @dataclass
 class Channel:
-    phase: int
     banks: list[Bank] = field(default_factory=lambda: [Bank(), Bank()])
-    refresh_ctr: int = 0
-    refresh_enable: bool = True
     refresh_busy_ctr: int = 0
     refresh_bank: int = 0
-    refresh_pending: bool = False
-    refresh_overdue: bool = False
     sticky_error: bool = False
     acc: int = 0
 
-    def __post_init__(self) -> None:
-        self.refresh_ctr = self.phase
-
     def tick_refresh(self) -> None:
-        if self.refresh_enable:
-            if self.refresh_ctr == 0:
-                self.refresh_ctr = REF_INTERVAL - 1
-                if self.refresh_busy_ctr or self.refresh_pending:
-                    self.refresh_overdue = True
-                else:
-                    self.refresh_pending = True
-            else:
-                self.refresh_ctr -= 1
-
         if self.refresh_busy_ctr:
             self.refresh_busy_ctr -= 1
-        elif self.refresh_pending:
-            self.refresh_pending = False
-            self.refresh_busy_ctr = REF_CYCLES
-            self.refresh_bank ^= 1
 
     def status(self) -> int:
         return (
             (int(self.sticky_error) << 7)
-            | (int(self.refresh_overdue) << 6)
-            | (int(self.refresh_pending) << 5)
             | (int(bool(self.refresh_busy_ctr)) << 4)
             | (int(self.banks[1].open) << 2)
             | (int(self.banks[0].open) << 1)
@@ -186,30 +161,18 @@ class Channel:
             return result
         if cmd.op == Opcode.REF:
             if self.refresh_busy_ctr:
-                self.refresh_overdue = True
+                self.sticky_error = True
             else:
                 self.refresh_busy_ctr = REF_CYCLES
                 self.refresh_bank = cmd.bank_a
-                self.refresh_pending = False
             return None
         if cmd.op == Opcode.STATUS:
             return self.status()
         if cmd.op == Opcode.CONFIG:
-            if cmd.subop == 2:
-                self.refresh_enable = bool(cmd.imm8 & 1)
-                self.refresh_ctr = REF_INTERVAL - 1
-                if not self.refresh_enable:
-                    self.refresh_pending = False
-                    self.refresh_overdue = False
-            elif cmd.subop == 3:
-                return int(self.refresh_enable)
-            else:
-                self.sticky_error = True
+            self.sticky_error = True
             return None
         if cmd.op == Opcode.ABORT:
-            self.refresh_pending = False
             self.refresh_busy_ctr = 0
-            self.refresh_overdue = False
             self.sticky_error = False
             self.acc = 0
             return None
@@ -220,7 +183,7 @@ class Channel:
 
 @dataclass
 class TinyPimModel:
-    channels: list[Channel] = field(default_factory=lambda: [Channel(0), Channel(32)])
+    channels: list[Channel] = field(default_factory=lambda: [Channel(), Channel()])
 
     def execute(self, cmd: Command) -> Optional[int]:
         return self.channels[cmd.ch].execute(cmd)

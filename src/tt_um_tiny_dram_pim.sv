@@ -325,9 +325,7 @@ module tt_um_tiny_dram_pim (
     end
   end
 
-  // Channel refresh phases are staggered so the two banks do not request
-  // autonomous refresh on the same core cycle after reset.
-  pim_channel #(.REF_PHASE(0)) ch0 (
+  pim_channel ch0 (
     .clk(clk),
     .rst_n(rst_n),
     .cmd_valid(cmd_ch0_local),
@@ -354,7 +352,7 @@ module tt_um_tiny_dram_pim (
     .acc_value(ch_acc[0])
   );
 
-  pim_channel #(.REF_PHASE(32)) ch1 (
+  pim_channel ch1 (
     .clk(clk),
     .rst_n(rst_n),
     .cmd_valid(cmd_ch1_local),

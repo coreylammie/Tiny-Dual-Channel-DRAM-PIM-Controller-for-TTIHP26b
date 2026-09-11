@@ -2,12 +2,12 @@
 
 This project asks a deliberately small question: how much of a DRAM processing-in-memory controller can fit in a tiny TinyTapeout IHP standard-cell macro?
 
-The result is a tiny dual-channel DRAM-PIM controller with real memory-control behavior, refresh state, and cross-bank compute. It is not a density-competitive DRAM macro. It is a silicon-testable controller architecture for near-memory operations under an extreme area budget. The useful idea is the compromise: keep the ISA expressive enough for row moves, status/debug, dot products, MACs, and experimental attention updates, but serialize or reuse the expensive arithmetic lanes enough that the design can still be evaluated against a TinyTapeout tile.
+The result is a tiny dual-channel DRAM-PIM controller with real memory-control behavior, explicit refresh, and cross-bank compute. It is not a density-competitive DRAM macro. It is a silicon-testable controller architecture for near-memory operations under an extreme area budget. The useful idea is the compromise: keep the ISA expressive enough for row moves, status/debug, dot products, MACs, and experimental attention updates, but serialize or reuse the expensive arithmetic lanes enough that the design can still be evaluated against a TinyTapeout tile.
 
 ## High-Level Design
 
 - **Host interface:** a 32-bit SPI command frame enters through the TinyTapeout `ui_in`/`uo_out` pins. Responses are returned on the following SPI frame with status and read data.
-- **Two independent channels:** each channel has its own control state, fixed-period refresh state, sticky error bit, bank pair, and 8-bit accumulator.
+- **Two independent channels:** each channel has its own control state, forced-refresh state, sticky error bit, bank pair, and 8-bit accumulator.
 - **Banked row store:** each channel contains two banks with two 8-bit rows per bank. `ACT`, `PRE`, `WR`, and `RD` expose a DRAM-like open-row programming model.
 - **Shared near-bank processing unit:** one PU is multiplexed between the two channels. Experimental `ATTEND`, `DOT`, and `MAC` use the shared multi-cycle lane stage.
 - **Variable compute resolution:** each compute command selects how an 8-bit row is interpreted: eight INT1 lanes, four signed INT2 lanes, or two signed INT4 lanes. INT8 remains encoded but is reserved for compute in the `1x1` target branch.
@@ -59,12 +59,12 @@ Current verification checkpoint:
 - Implements experimental `ATTEND`, `DOT`, `MAC`, and `ACC`; `VOP` subopcode 1 is reserved on this area-focused branch
 - Commands issued while the shared PIM operation is busy set sticky error and are dropped
 - Preserves two channels and two banks per channel with two rows per bank for the `1x1` target branch
-- Adds `CONFIG` subops to enable/disable automatic refresh and read back that enable bit
+- Uses explicit host-issued `REF`; `CONFIG` is reserved on this area-focused branch
 - Uses only `uo_out[0]` for SPI MISO; remaining output pins are tied low and status is read over SPI
 - Opcode `0x7` is reserved and sets sticky error
 - Model/example tests: 24 passing
 - Cocotb SPI RTL tests: 11 TinyTapeout-wrapper tests passing
-- Synthesis: 1665 cells, total mapped area 28541.0034, lint-clean on this experimental branch
+- Synthesis: 1591 cells, total mapped area 26687.4426, lint-clean on this experimental branch
 - Official TinyTapeout area target: `1x1` tile for the reduced-depth feature set
 - Latest official TinyTapeout `1x1` GDS check: failed global placement at 105.850% utilization after reserving `VOP` subopcode 0
 - Local KLayout/Magic DRC: not yet rerun for this no-STREAM branch

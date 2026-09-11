@@ -12,7 +12,7 @@ The Stage 2 baseline uses scaled architectural timing in the main TinyTapeout `c
 | RD | 1 core clock after decode, response available on next SPI frame |
 | REF forced start | 1 core clock after decode |
 | REF busy time | 4 core clocks |
-| Automatic refresh interval | Fixed 255 core clocks per channel; optionally disabled through `CONFIG` |
+| Automatic refresh interval | Not implemented in the 1x1 fitting branch; host issues explicit `REF` |
 
 ## Lane-Serial DOT/MAC Accumulator Checkpoint
 
@@ -34,4 +34,4 @@ Multi-row dot products and attention updates are host-driven sequences of `ACT`,
 
 ## Refresh Control
 
-`CONFIG subopcode 2` sets automatic refresh enable from `imm8[0]`; `CONFIG subopcode 3` reads the enable bit back. Disabling automatic refresh stops the autonomous counter from creating pending refresh work and clears pending/overdue refresh state. Forced `REF` commands still run. Reset enables automatic refresh with a fixed 255-core-clock interval. `ABORT` clears pending/busy/overdue refresh state but leaves the enable bit unchanged.
+`CONFIG` is reserved in the 1x1 fitting branch and sets sticky error. Refresh is host-driven through explicit `REF`. `ABORT` clears refresh busy state for the selected channel.
