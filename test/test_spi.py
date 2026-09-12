@@ -182,6 +182,30 @@ async def spi_reduce_mac_accumulates_dot(dut):
 
 
 @cocotb.test()
+async def spi_acc_clear_returns_byte_zero_then_clears(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset(dut)
+    spi = SpiDriver(dut)
+
+    await spi.transfer32(isa.abort(0).encode())
+    await spi.transfer32(isa.act(0, 0, 1).encode())
+    await spi.transfer32(isa.wr(0, 0, 0b1010_1111).encode())
+    await spi.transfer32(isa.act(0, 1, 1).encode())
+    await spi.transfer32(isa.wr(0, 1, 0b1111_0001).encode())
+
+    await spi.transfer32(isa.reduce_dot(0, isa.Precision.INT1, 0, 1).encode())
+    await wait_core_clocks(dut, 8)
+    await spi.transfer32(isa.acc(0, 4).encode())
+    clear_rsp = await spi.transfer32(isa.acc(0, 0).encode())
+    after_rsp = await spi.transfer32(isa.nop().encode())
+
+    assert (clear_rsp >> 24) == 0xA0
+    assert (clear_rsp & 0xFF) == 3
+    assert (after_rsp >> 24) == 0xA0
+    assert (after_rsp & 0xFF) == 0
+
+
+@cocotb.test()
 async def spi_config_is_reserved(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     await reset(dut)

@@ -144,6 +144,15 @@ def test_mac_accumulates_dot_product():
     assert model.execute(isa.acc(1, 1)) == 0
 
 
+def test_acc_subopcode_four_returns_byte_zero_and_clears_accumulator():
+    model = TinyPimModel()
+    open_and_write_pair(model, 1, 0b1010_1111, 0b1111_0001)
+    model.execute(isa.reduce_dot(1, isa.Precision.INT1, 0, 1))
+
+    assert model.execute(isa.acc(1, 4)) == 3
+    assert model.execute(isa.acc(1, 0)) == 0
+
+
 def test_dot_int4_uses_signed_lanes():
     model = TinyPimModel()
     open_and_write_pair(model, 1, 0x8F, 0x21)
@@ -195,9 +204,10 @@ def test_attend_int1_is_invalid():
 
 def test_int2_compute_precision_is_reserved():
     model = TinyPimModel()
-    open_and_write_pair(model, 1, 0x01, 0x01)
+    open_and_write_pair(model, 1, 0x01, 0x55)
     model.execute(isa.vop(1, isa.Vop.ATTEND, isa.Precision.INT2, 0, 1, dest_bank=0))
     assert model.channels[1].sticky_error
+    assert model.execute(isa.rd(1, 1)) == 0x55
 
     model.execute(isa.abort(1))
     open_and_write_pair(model, 1, 0x01, 0x01)

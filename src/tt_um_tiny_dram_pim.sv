@@ -205,6 +205,8 @@ module tt_um_tiny_dram_pim (
     ((decoded_op == OP_REDUCE) &&
       ((decoded_subop == REDUCE_DOT) || (decoded_subop == REDUCE_MAC)) &&
       ((decoded_precision == PREC_INT1) || (decoded_precision == PREC_INT4)));
+  wire decoded_aborts_active_pu =
+    cmd_valid && (decoded_op == OP_ABORT) && (decoded_ch == pu_ch);
 
   always_comb begin
     pu_row_we = 2'b00;
@@ -214,7 +216,7 @@ module tt_um_tiny_dram_pim (
     pu_acc_data = '0;
     pu_error_set = 2'b00;
 
-    if (pu_busy) begin
+    if (pu_busy && !decoded_aborts_active_pu) begin
       if (pu_is_attend) begin
         if (pu_lane == dot_last_lane(pu_precision)) begin
           if (pu_ch) begin

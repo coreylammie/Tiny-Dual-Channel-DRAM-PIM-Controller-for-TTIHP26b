@@ -155,4 +155,4 @@ def reduce_mac(ch: int, precision: Precision, bank_a: int, bank_b: int) -> Comma
 
 
 def acc(ch: int, byte: int = 0) -> Command:
-    return Command(Opcode.ACC, ch=ch, subop=byte & 0x3)
+    return Command(Opcode.ACC, ch=ch, subop=byte & 0x7)

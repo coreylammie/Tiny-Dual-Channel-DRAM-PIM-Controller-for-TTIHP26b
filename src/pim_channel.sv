@@ -64,6 +64,7 @@ module pim_channel (
   assign target_row = active_row[uop_bank_a];
   assign row_invalid = uop_row_a[1];
   assign target_refreshing = refresh_busy && (refresh_bank == uop_bank_a);
+  wire aborting_this_channel = cmd_valid && (uop_op == OP_ABORT);
 
   assign bank_open = {open[1], open[0]};
   assign refresh_busy_o = refresh_busy;
@@ -107,10 +108,10 @@ module pim_channel (
         refresh_busy_ctr <= refresh_busy_ctr - 3'd1;
       end
 
-      if (pu_row_we) begin
+      if (pu_row_we && !aborting_this_channel) begin
         rows[pu_row_bank][active_row[pu_row_bank]] <= pu_row_data;
       end
-      if (pu_acc_we) begin
+      if (pu_acc_we && !aborting_this_channel) begin
         acc <= pu_acc_data;
       end
       if (pim_error_set) begin

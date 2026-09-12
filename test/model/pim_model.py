@@ -123,7 +123,7 @@ class Channel:
             if not bank.open or not bank_b.open or refreshing or refresh_b:
                 self.sticky_error = True
                 return None
-            if cmd.subop == Vop.ATTEND and cmd.precision in (Precision.INT2, Precision.INT4):
+            if cmd.subop == Vop.ATTEND and cmd.precision == Precision.INT4:
                 bank_b.rows[bank_b.active_row] = self._attend(
                     bank.rows[bank.active_row],
                     bank_b.rows[bank_b.active_row],
