@@ -17,14 +17,14 @@ This file is the short public-facing status snapshot. The detailed historical ar
 - Python model/example tests: 27 pass, 0 fail
 - Cocotb TinyTapeout-wrapper RTL tests from `test/`: 12 pass, 0 fail
 - Latest local synthesis checkpoint: 1486 cells, total mapped area 25560.8514, lint-clean on this experimental branch
-- Latest official TinyTapeout `1x1` GDS check: pass, including GDS build, precheck, gate-level test, and viewer generation
+- Latest official TinyTapeout `1x1` GDS check: pass on commit `2fc7515`, including GDS build, precheck, gate-level test, and viewer generation
 - Latest route/DRC checkpoint: official TinyTapeout GDS build reports route DRC 0, Magic DRC 0, LVS 0, antenna violations 0, setup violations 0, and hold violations 0
-- Routed standard-cell utilization: 95.304% in the official TinyTapeout GDS build
+- Routed standard-cell utilization: 95.581% in the official TinyTapeout GDS build
 - Official TinyTapeout tile setting: `1x1` on the reduced-depth target branch
 
 ## Remaining External Check
 
 Final TinyTapeout confidence now depends on manual review of the generated artifacts and any shuttle-specific submission checks outside this repository:
 
-- `test` workflow for Ubuntu cocotb regression passed on the final branch commit
-- `gds` workflow for TinyTapeout GDS build, precheck, gate-level test, and viewer generation passed on the final branch commit
+- `test` workflow for Ubuntu cocotb regression passed on commit `2fc7515`
+- `gds` workflow for TinyTapeout GDS build, precheck, gate-level test, and viewer generation passed on commit `2fc7515`
