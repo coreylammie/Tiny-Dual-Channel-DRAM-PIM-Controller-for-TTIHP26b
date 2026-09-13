@@ -1,10 +1,10 @@
-# Tiny Dual-Channel DRAM-PIM Controller Architecture
+# Tiny Dual-Channel DRAM-PIM Controller + PU Architecture
 
-This project is a standard-cell RTL implementation of a tiny dual-channel DRAM-PIM controller featuring shared lane-serial cross-bank compute, refresh-aware memory control, and independently addressable channels under an extreme silicon-area constraint.
+This project is a standard-cell RTL implementation of a tiny DRAM-PIM controller plus a shared near-bank processing unit. The controller provides SPI command transport, refresh-aware DRAM-like channel control, and banked row access; the PU provides lane-serial cross-bank compute under an extreme silicon-area constraint.
 
 ## 64-Bit 1x1 Target Checkpoint
 
-The current checkpoint implements the transport and memory-control foundation plus the first PU operations:
+The current checkpoint implements the controller foundation plus the first shared-PU operations:
 
 ```text
 SPI slave
@@ -18,9 +18,9 @@ Each bank stores two 8-bit rows, an open-row bit, and a two-bit active-row index
 
 Each channel owns a small forced-refresh state machine. `REF` starts a fixed four-cycle refresh on the selected bank, and accesses to the refreshing bank set sticky error. Autonomous refresh scheduling and `CONFIG` read/write state are reserved in this 1x1 fitting branch to reduce area.
 
-Each channel owns an 8-bit accumulator, while both channels share one lane-serial arithmetic PU. If a PIM command arrives while the shared PU is busy, the command is dropped and sticky error is set. `ABORT` clears the selected channel's sticky error, refresh state, accumulator, and any active PIM operation owned by that channel.
+Each channel owns an 8-bit accumulator, while both channels share one lane-serial near-bank PU. If a PIM command arrives while the shared PU is busy, the command is dropped and sticky error is set. `ABORT` clears the selected channel's sticky error, refresh state, accumulator, and any active PIM operation owned by that channel.
 
-The implemented PIM operations are experimental `ATTEND`, `DOT`, and `MAC`, plus accumulator byte reads. `ATTEND` reuses signed lane extraction and multiply-add logic to update the active output/state row in bank B from a value row in bank A and the low INT4 lane of the selected channel accumulator. `DOT` and `MAC` share a lane-serial accumulator datapath: INT1 uses an 8-bit popcount term, while INT4 adds one signed lane product per busy cycle. INT2/INT8 compute and the generic `VADD` slot are reserved in this area-focused branch. Multi-row dot products and attention updates are host-driven sequences of `ACT`, `DOT`/`MAC`, and `ATTEND`; opcode `0x7` and the remaining secondary PU subopcodes are reserved.
+The implemented PU operations are experimental `ATTEND`, `DOT`, and `MAC`, plus accumulator byte reads. `ATTEND` reuses signed lane extraction and multiply-add logic to update the active output/state row in bank B from a value row in bank A and the low INT4 lane of the selected channel accumulator. `DOT` and `MAC` share a lane-serial accumulator datapath: INT1 uses an 8-bit popcount term, while INT4 adds one signed lane product per busy cycle. INT2/INT8 compute and the generic `VADD` slot are reserved in this area-focused branch. Multi-row dot products and attention updates are host-driven sequences of `ACT`, `DOT`/`MAC`, and `ATTEND`; opcode `0x7` and the remaining secondary PU subopcodes are reserved.
 
 ## TinyTapeout Pins
 

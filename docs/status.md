@@ -8,7 +8,7 @@ This file is the short public-facing status snapshot. The detailed historical ar
 - Interface: fixed 32-bit SPI command framing with next-frame responses
 - Physical I/O: SPI is implemented on `ui_in[0]`, `ui_in[1]`, `ui_in[2]`, and `uo_out[0]`; remaining output pins are tied low
 - Memory commands: `ACT`, `PRE`, `WR`, `RD`, `REF`, `STATUS`, `ABORT`, and `NOP`; `CONFIG` is reserved
-- PIM operations: experimental `ATTEND`, `DOT`, `MAC`, and 8-bit `ACC`; one shared PU is multiplexed between both channels, while INT2/INT8 compute and the generic `VADD` slot are reserved for area
+- PU operations: experimental `ATTEND`, `DOT`, `MAC`, and 8-bit `ACC`; one shared near-bank PU is multiplexed between both channels, while INT2/INT8 compute and the generic `VADD` slot are reserved for area
 - Refresh: explicit host-issued `REF` with refresh-busy bank blocking; autonomous refresh is reserved for area
 - Busy handling: PIM commands issued while the shared PU is busy set sticky error and are dropped
 

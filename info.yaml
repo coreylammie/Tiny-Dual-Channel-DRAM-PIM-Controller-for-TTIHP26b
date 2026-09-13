@@ -1,8 +1,8 @@
 project:
-  title: Tiny Dual-Channel DRAM-PIM Controller
+  title: Tiny Dual-Channel DRAM-PIM Controller + PU
   author: Corey Lammie
   discord: ""
-  description: Standard-cell tiny dual-channel DRAM-PIM controller architecture
+  description: Standard-cell DRAM-like controller with a shared near-bank PU
   language: SystemVerilog
   clock_hz: 10000000
   tiles: "1x1"

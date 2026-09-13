@@ -1,19 +1,19 @@
-# Tiny Dual-Channel DRAM-PIM Controller for TTIHP26b
+# Tiny Dual-Channel DRAM-PIM Controller + PU for TTIHP26b
 
-This project asks a deliberately small question: how much of a DRAM processing-in-memory controller can fit in a tiny TinyTapeout IHP standard-cell macro?
+This project asks a deliberately small question: how much of a DRAM-style controller plus a near-bank processing unit can fit in a tiny TinyTapeout IHP standard-cell macro?
 
-The result is a tiny dual-channel DRAM-PIM controller with real memory-control behavior, explicit refresh, and cross-bank compute. It is not a density-competitive DRAM macro. It is a silicon-testable controller architecture for near-memory operations under an extreme area budget. The useful idea is the compromise: keep the ISA expressive enough for row moves, status/debug, dot products, MACs, and experimental attention updates, but serialize or reuse the expensive arithmetic lanes enough that the design can still be evaluated against a TinyTapeout tile.
+The result is a small DRAM-PIM controller/PU pair: a controller exposes DRAM-like row activation, bank access, explicit refresh, status, and error handling, while a shared near-bank PU performs compact cross-bank compute. It is not a density-competitive DRAM macro. It is a silicon-testable controller and compute substrate for near-memory operations under an extreme area budget. The useful idea is the compromise: keep the ISA expressive enough for row moves, status/debug, dot products, MACs, and experimental attention updates, but serialize or reuse the expensive arithmetic lanes enough that the design can still be evaluated against a TinyTapeout tile.
 
 ## High-Level Design
 
-- **Host interface:** a 32-bit SPI command frame enters through the TinyTapeout `ui_in`/`uo_out` pins. Responses are returned on the following SPI frame with status and read data.
-- **Two independent channels:** each channel has its own control state, forced-refresh state, sticky error bit, bank pair, and 8-bit accumulator.
-- **Banked row store:** each channel contains two banks with two 8-bit rows per bank. `ACT`, `PRE`, `WR`, and `RD` expose a DRAM-like open-row programming model.
-- **Shared near-bank processing unit:** one PU is multiplexed between the two channels. Experimental `ATTEND`, `DOT`, and `MAC` use the shared multi-cycle lane stage.
-- **Variable compute resolution:** each compute command selects how an 8-bit row is interpreted: eight INT1 lanes or two signed INT4 lanes. INT2 and INT8 remain encoded but are reserved for compute in the `1x1` target branch.
-- **Host-driven row sequencing:** multi-row dot products and attention updates are expressed as explicit row activations plus PU commands, preserving the compute primitive while avoiding autonomous row-walk control state.
+- **Controller front end:** a 32-bit SPI command frame enters through the TinyTapeout `ui_in`/`uo_out` pins. Responses are returned on the following SPI frame with status and read data.
+- **DRAM-like channel control:** each of the two channels owns open-row state, forced-refresh state, sticky error handling, a two-bank row store, and an 8-bit accumulator.
+- **Banked row store:** each channel contains two banks with two 8-bit rows per bank. `ACT`, `PRE`, `WR`, and `RD` expose an open-row programming model rather than a flat register file.
+- **Shared near-bank PU:** one lane-serial processing unit is multiplexed between the two channels. Experimental `ATTEND`, `DOT`, and `MAC` use the shared multi-cycle lane stage.
+- **Variable compute resolution:** each PU command selects how an 8-bit row is interpreted: eight INT1 lanes or two signed INT4 lanes. INT2 and INT8 remain encoded but are reserved for compute in the `1x1` target branch.
+- **Host-driven PU sequencing:** multi-row dot products and attention updates are expressed as explicit row activations plus PU commands, preserving the compute primitive while avoiding autonomous row-walk control state.
 
-The experimental `ATTEND` operation is intended as a tiny analogue of attention-value accumulation: after `DOT` or `MAC` computes an attention score in `ACC`, `ATTEND` updates `bank_b_active_row = bank_b_active_row + bank_a_active_row * ACC_low`, evaluated through the shared lane stage at INT4 precision.
+The experimental `ATTEND` operation is intended as a tiny analogue of attention-value accumulation in the PU: after `DOT` or `MAC` computes an attention score in `ACC`, `ATTEND` updates `bank_b_active_row = bank_b_active_row + bank_a_active_row * ACC_low`, evaluated through the shared lane stage at INT4 precision.
 
 ## Quick Start
 
