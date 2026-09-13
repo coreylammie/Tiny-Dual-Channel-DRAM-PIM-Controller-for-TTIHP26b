@@ -63,7 +63,7 @@ Current verification checkpoint:
 - Uses only `uo_out[0]` for SPI MISO; remaining output pins are tied low and status is read over SPI
 - Opcode `0x7` is reserved and sets sticky error
 - Model/example tests: 27 passing
-- Cocotb SPI RTL tests: 12 TinyTapeout-wrapper tests passing
+- Cocotb SPI RTL tests: 17 TinyTapeout-wrapper tests passing on the coverage branch
 - Synthesis: 1486 cells, total mapped area 25560.8514, lint-clean on this experimental branch
 - Official TinyTapeout area target: `1x1` tile for the reduced-depth feature set
 - Latest official TinyTapeout `1x1` GDS check: passing on merge commit `8c64639`, including precheck, gate-level test, and viewer generation
