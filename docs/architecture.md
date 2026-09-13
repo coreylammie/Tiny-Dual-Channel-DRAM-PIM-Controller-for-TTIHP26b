@@ -1,8 +1,8 @@
 # Tiny Dual-Channel DRAM-PIM Controller Architecture
 
-This project is a standard-cell RTL implementation of a tiny dual-channel DRAM-PIM controller featuring lane-serial cross-bank compute, refresh-aware scheduling, one-entry command queueing, and independently concurrent channels under an extreme silicon-area constraint.
+This project is a standard-cell RTL implementation of a tiny dual-channel DRAM-PIM controller featuring shared lane-serial cross-bank compute, refresh-aware memory control, and independently addressable channels under an extreme silicon-area constraint.
 
-## 128-Bit Stream Checkpoint
+## 64-Bit 1x1 Target Checkpoint
 
 The current checkpoint implements the transport and memory-control foundation plus the first PU operations:
 
@@ -10,22 +10,22 @@ The current checkpoint implements the transport and memory-control foundation pl
 SPI slave
   -> 32-bit command decoder
   -> channel select
-     -> channel 0: 2 banks x 4 rows x 8 bits
-     -> channel 1: 2 banks x 4 rows x 8 bits
+     -> channel 0: 2 banks x 2 rows x 8 bits
+     -> channel 1: 2 banks x 2 rows x 8 bits
 ```
 
-Each bank stores four 8-bit rows, an open-row bit, and a two-bit active-row index. There is no duplicated row-buffer storage. `ACT` records the selected row, `WR` and `RD` target the currently active row, and `PRE` closes the bank.
+Each bank stores two 8-bit rows, an open-row bit, and a two-bit active-row index. There is no duplicated row-buffer storage. `ACT` records the selected row, `WR` and `RD` target the currently active row, and `PRE` closes the bank.
 
-Each channel owns independent refresh state. Channel 0 starts at refresh phase 0 and channel 1 starts at phase 32 to avoid synchronized refresh behavior. `CONFIG` can update/read the selected channel's automatic refresh reload counter and enable/disable autonomous refresh scheduling. Forced `REF` commands remain available when autonomous refresh is disabled.
+Each channel owns a small forced-refresh state machine. `REF` starts a fixed four-cycle refresh on the selected bank, and accesses to the refreshing bank set sticky error. Autonomous refresh scheduling and `CONFIG` read/write state are reserved in this 1x1 fitting branch to reduce area.
 
-Each channel also owns an 18-bit accumulator, a small atomic-operation busy counter, stream row-walk state, and one pending command slot. If a command arrives while the channel PIM datapath is busy, the channel accepts one queued command and reports it through status bit 0. A second command while the slot is occupied sets sticky error. `ABORT` clears the pending slot, stream state, sticky error, and refresh state.
+Each channel owns an 8-bit accumulator, while both channels share one lane-serial arithmetic PU. If a PIM command arrives while the shared PU is busy, the command is dropped and sticky error is set. `ABORT` clears the selected channel's sticky error, refresh state, accumulator, and any active PIM operation owned by that channel.
 
-The implemented PIM operations are `VXOR`, `VAND`, `VOR`, `VADD`, `VSUB`, `DOT`, `MAC`, `SUM`, `POPCNT`, `XNORDOT`, `STREAM.DOT`, and `STREAM.MAC`. `DOT`, `MAC`, and `STREAM` share a lane-serial accumulator datapath: INT1 uses an 8-bit popcount term, while INT2/INT4/INT8 add one signed lane product per busy cycle. This avoids the rejected full parallel dot-product datapath while cutting the earlier 144-cycle serial latency.
+The implemented PIM operations are experimental `ATTEND`, `DOT`, and `MAC`, plus accumulator byte reads. `ATTEND` reuses signed lane extraction and multiply-add logic to update the active output/state row in bank B from a value row in bank A and the low INT4 lane of the selected channel accumulator. `DOT` and `MAC` share a lane-serial accumulator datapath: INT1 uses an 8-bit popcount term, while INT4 adds one signed lane product per busy cycle. INT2/INT8 compute and the generic `VADD` slot are reserved in this area-focused branch. Multi-row dot products and attention updates are host-driven sequences of `ACT`, `DOT`/`MAC`, and `ATTEND`; opcode `0x7` and the remaining secondary PU subopcodes are reserved.
 
 ## TinyTapeout Pins
 
-`ui_in[0]` is SPI SCLK, `ui_in[1]` is active-low CS, and `ui_in[2]` is MOSI. `uo_out[0]` is MISO. Remaining output bits expose compact debug status for open banks and refresh-busy state.
+`ui_in[0]` is SPI SCLK, `ui_in[1]` is active-low CS, and `ui_in[2]` is MOSI. `uo_out[0]` is MISO. Remaining output bits are tied low; machine-readable status is available through `STATUS` commands.
 
 ## Physical Status
 
-The latest local LibreLane run is route-clean and DRC-clean under the standalone local config and generic fallback SDC. Final TinyTapeout signoff still needs the official submission/precheck environment.
+The current 1x1 branch passes the official TinyTapeout GDS workflow, including precheck, gate-level test, and viewer generation. The routed design reports 95.581% standard-cell utilization with route DRC 0, Magic DRC 0, LVS 0, antenna violations 0, setup violations 0, hold violations 0, max slew violations 0, and max cap violations 0.

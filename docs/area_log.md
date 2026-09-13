@@ -17,6 +17,14 @@
 | 3b-parallel-dot-exp | 128b | experimental one-cycle parallel DOT/MAC/STREAM datapath | 16880 | 483 | N/A | N/A | rejected at synthesis | Model and cocotb behavior passed, but mapped area rose to 193566.8826 and synthesis check errors rose to 618. Not pursued to PnR. |
 | 3b-lane-dot | 128b | lane-serial DOT/MAC/STREAM datapath compromise | 5441 synth / 6903 routed | 525 | 56.7% routed | setup WNS 0.0 | standalone routed, TT signoff pending | Model and cocotb behavior pass locally. Route/Magic/KLayout DRC passed with 0 errors and 0 antenna violations under generic fallback SDC. |
 | 3b-config-control | 128b | config readback plus auto-refresh enable control | 5495 synth / 6926 routed | 527 | 56.1% routed | setup WNS 0.0 | standalone routed, TT signoff pending | Model and cocotb behavior pass locally. Route/Magic/KLayout DRC passed with 0 errors and 0 antenna violations under generic fallback SDC. |
+| exp-pimba-kvupd | 64b | experimental lane-serial KV/state update row op over shared PU substrate | 1886 | 304 | TBD | TBD | synthesis-only, experimental | Adds `VOP.KVUPD`: `bank B = bank B + bank A * imm8` at INT2/INT4 packed lane precision. Model/demo tests pass, cocotb RTL tests pass, and LibreLane/Yosys synthesis is lint-clean. Area is 31074.4350, up 2728.6686 from the no-VXOR 1x1 baseline. An earlier immediate writeback version synthesized to 1752 cells and 29270.0520 area, but it was less aligned with the reusable staged-PU idea. |
+| exp-pimba-attend | 64b | experimental attention update op consuming accumulator score | 1902 | 300 | TBD | TBD | synthesis-only, experimental | Replaces generic host-scalar `KVUPD` with `VOP.ATTEND`: after `DOT`/`MAC`, bank B is updated as `bank B = bank B + bank A * ACC_low` at INT2/INT4 packed lane precision. Model/demo tests pass, cocotb RTL tests pass, and LibreLane/Yosys synthesis is lint-clean. Area is 30696.4350, up 2350.6686 from the no-VXOR 1x1 baseline and down 378.0000 from lane-serial `KVUPD`. |
+| exp-pimba-attend-no-vadd | 64b | experimental attention update op, generic VADD reserved | 1828 | 302 | TBD | TBD | synthesis-only, experimental | Keeps accumulator-fed `VOP.ATTEND`, `DOT`, `MAC`, and accumulator byte reads, but reserves the old generic `VADD` subopcode. Model/demo tests pass, cocotb RTL tests pass, and LibreLane/Yosys synthesis is lint-clean. Area is 30463.5870, down 232.8480 from `exp-pimba-attend` but still up 2117.8206 from the no-VXOR 1x1 baseline. |
+| 1x1-attend-pu-slim | 64b | narrowed DOT lane multiply plus one-bit PU busy state | 1750 | 300 | TBD | TBD | synthesis-only, experimental | Keeps `ATTEND`, `DOT`, `MAC`, INT1/INT2/INT4 compute, and 14-bit accumulators. LibreLane/Yosys synthesis is lint-clean. Area is 29937.6756, down 525.9114 from `exp-pimba-attend-no-vadd`. |
+| 1x1-attend-pu-slim-acc8 | 64b | narrowed DOT lane multiply, one-bit PU busy state, 8-bit accumulators | 1665 | 288 | TBD | TBD | synthesis-only, experimental | Keeps two channels, two banks/channel, INT1/INT2/INT4 DOT/MAC, and accumulator-fed INT2/INT4 `ATTEND`, while narrowing each channel accumulator to 8 bits. Model/demo tests pass, cocotb RTL tests pass, and LibreLane/Yosys synthesis is lint-clean. Area is 28541.0034, down 1922.5836 from `exp-pimba-attend-no-vadd` and up only 195.2370 from the prior no-VXOR 1x1 baseline. |
+| 1x1-attend-explicit-ref | 64b | explicit REF only, narrowed PU, 8-bit accumulators | 1591 | 262 | TBD | TBD | synthesis-only, experimental | Removes autonomous refresh scheduling and reserves `CONFIG`, while preserving explicit `REF`, two channels, two banks/channel, INT1/INT2/INT4 DOT/MAC, and accumulator-fed INT2/INT4 `ATTEND`. Model/demo tests pass, cocotb RTL tests pass, and LibreLane/Yosys synthesis is lint-clean. Area is 26687.4426, down 1853.5608 from the ACC8 auto-refresh candidate and down 1658.3238 from the prior no-VXOR 1x1 baseline. |
+| 1x1-attend-explicit-ref-int4only | 64b | explicit REF only, INT2 compute reserved | 1514 synth / 1733 routed | 262 | 95.304% routed | setup/hold WNS 0.0 | official GDS pass | Reserves INT2 compute while preserving explicit `REF`, two channels, two banks/channel, INT1/INT4 DOT/MAC, and accumulator-fed INT4 `ATTEND`. INT2 tensors can still be represented in software and promoted to INT4 execution. Official TinyTapeout GDS, precheck, gate-level test, and viewer jobs pass. Final routed instance area is 27582.5 on a 28941.5 core. |
+| self-review-abort-guard | 64b | INT2 compute reserved, ACC helper/test cleanup, abort-priority guard | 1486 synth / 1735 routed | 262 | 95.581% routed | setup/hold WNS 0.0 | official GDS pass | Fixes the Python model so reserved INT2 `ATTEND` sets sticky error without modifying the destination row, exposes the documented `ACC` subopcode 4 clear encoding through the ISA helper, and gives channel-local `ABORT` priority over same-cycle PU row/accumulator side effects. Python model/example tests pass with 27 cases, cocotb RTL tests pass with 12 cases, and LibreLane/Yosys synthesis is lint-clean. Official TinyTapeout GDS, precheck, gate-level test, and viewer jobs pass on commit `2fc7515`; final placement area is 27662.51 on a 28941.494 core. |
 
 ## Local Check Log
 
@@ -33,6 +41,33 @@
 | 2026-08-31 | `RUN_TAG=stage3b-64b-synth scripts/synth.sh` | PASS through `Yosys.Synthesis` for 64-bit fallback. 2577 cells, area 39374.2566, 0 lint warnings. |
 | 2026-08-31 | `TO_STEP=OpenROAD.GlobalPlacement RUN_TAG=stage3b-64b-gpl scripts/synth.sh` | PASS through global placement. Final weighted congestion 0.7181, total routing overflow 0.0000. |
 | 2026-08-31 | `TO_STEP=OpenROAD.DetailedRouting RUN_TAG=stage3b-64b-route scripts/synth.sh` | PASS through detailed routing. Route DRC errors 0, antenna violations 0, routed area 52742.8, utilization 60.5%. Uses generic fallback SDC, so TinyTapeout signoff remains open. |
+| 2026-09-10 | `/private/tmp/tto-kvupd-venv/bin/python -m pytest test/test_model.py test/test_dense_layer_demo.py` | PASS, 25 tests including `KVUPD` model coverage. |
+| 2026-09-10 | `make -C test` | PASS, 11 TinyTapeout-wrapper cocotb RTL tests including SPI-visible `KVUPD.INT4` state-row update. |
+| 2026-09-10 | `RUN_TAG=exp-pimba-kvupd-clean-synth scripts/synth.sh` | PASS through `Yosys.Synthesis`, lint-clean. Immediate `KVUPD` version: 1752 cells, 287 sequential cells, area 29270.0520, sequential area 14059.7856. |
+| 2026-09-10 | `RUN_TAG=exp-pimba-kvupd-serial-synth scripts/synth.sh` | PASS through `Yosys.Synthesis`, lint-clean. Lane-serial shared-stage `KVUPD` version: 1886 cells, 304 sequential cells, area 31074.4350, sequential area 14892.5952. |
+| 2026-09-10 | `/private/tmp/tto-kvupd-venv/bin/python -m pytest test/test_model.py test/test_dense_layer_demo.py` | PASS, 25 tests after replacing `KVUPD` with accumulator-fed `ATTEND`. |
+| 2026-09-10 | `make -C test` | PASS, 11 TinyTapeout-wrapper cocotb RTL tests including SPI-visible `DOT` followed by `ATTEND.INT4`. |
+| 2026-09-10 | `RUN_TAG=exp-pimba-attend-clean-synth scripts/synth.sh` | PASS through `Yosys.Synthesis`, lint-clean. Accumulator-fed `ATTEND` version: 1902 cells, 300 sequential cells, area 30696.4350, sequential area 14696.6400. |
+| 2026-09-10 | `/private/tmp/tto-kvupd-venv/bin/python -m pytest test/test_model.py test/test_dense_layer_demo.py` | PASS, 24 tests after reserving generic `VADD` and keeping accumulator-fed `ATTEND`. |
+| 2026-09-10 | `make -C test` | PASS, 11 TinyTapeout-wrapper cocotb RTL tests including SPI-visible `DOT` followed by `ATTEND.INT4`, with `VOP` subopcode 1 reserved. |
+| 2026-09-10 | `RUN_TAG=exp-pimba-attend-no-vadd-clean-synth scripts/synth.sh` | PASS through `Yosys.Synthesis`, lint-clean. `ATTEND` without generic `VADD`: 1828 cells, 302 sequential cells, area 30463.5870, sequential area 14794.6176. |
+| 2026-09-10 | `/private/tmp/tto-kvupd-venv/bin/python -m pytest test/test_model.py test/test_dense_layer_demo.py` | PASS, 24 tests after narrowing the PU control/multiplier and accumulator to 8 bits. |
+| 2026-09-10 | `make -C test` | PASS, 11 TinyTapeout-wrapper cocotb RTL tests for the ACC8 attention candidate. |
+| 2026-09-10 | `RUN_TAG=1x1-attend-pu-slim-clean-synth scripts/synth.sh` | PASS through `Yosys.Synthesis`, lint-clean. PU-slim with 14-bit accumulators: 1750 cells, 300 sequential cells, area 29937.6756, sequential area 14696.6400. |
+| 2026-09-10 | `RUN_TAG=1x1-attend-pu-slim-acc8-synth scripts/synth.sh` | PASS through `Yosys.Synthesis`, lint-clean. PU-slim with 8-bit accumulators: 1665 cells, 288 sequential cells, area 28541.0034, sequential area 14108.7744. |
+| 2026-09-11 | `/private/tmp/tto-kvupd-venv/bin/python -m pytest test/test_model.py test/test_dense_layer_demo.py` | PASS, 24 tests after reserving autonomous refresh/`CONFIG` and keeping explicit `REF`. |
+| 2026-09-11 | `make -C test` | PASS, 11 TinyTapeout-wrapper cocotb RTL tests for the explicit-REF attention candidate. |
+| 2026-09-11 | `RUN_TAG=1x1-attend-explicit-ref-synth scripts/synth.sh` | PASS through `Yosys.Synthesis`, lint-clean. Explicit-REF attention candidate: 1591 cells, 262 sequential cells, area 26687.4426, sequential area 12835.0656. |
+| 2026-09-11 | `RUN_TAG=1x1-attend-explicit-ref-int4only-clean-synth scripts/synth.sh` | PASS through `Yosys.Synthesis`, lint-clean. INT4-only attention candidate: 1514 cells, 262 sequential cells, area 25579.1844, sequential area 12835.0656. |
+| 2026-09-12 | `/private/tmp/tto-kvupd-venv/bin/python -m pytest test/test_model.py test/test_dense_layer_demo.py` | PASS, 27 tests after self-review model and ISA-helper fixes. |
+| 2026-09-12 | `PATH=/private/tmp/tto-cocotb-venv2/bin:/private/tmp/tto-kvupd-venv/bin:$PATH make -C test` | PASS, 12 TinyTapeout-wrapper cocotb RTL tests including SPI-visible `ACC` subopcode 4 clear/readback coverage. |
+| 2026-09-12 | `RUN_TAG=self-review-abort-guard-synth scripts/synth.sh` | PASS through `Yosys.Synthesis`, lint-clean. Review checkpoint: 1486 cells, 262 sequential cells, area 25560.8514, sequential area 12835.0656. |
+| 2026-09-12 | GitHub Actions `test` run 34680526107 | PASS, Ubuntu cocotb regression on commit `2fc7515`. |
+| 2026-09-12 | GitHub Actions `gds` run 34680526175 | PASS, official TinyTapeout GDS build, precheck, gate-level test, and viewer generation on commit `2fc7515`. Routed utilization 95.581%, final placement area 27662.51 / core area 28941.494, route DRC 0, Magic DRC 0, LVS 0, antenna violations 0, setup violations 0, hold violations 0, max slew violations 0, and max cap violations 0. |
+| 2026-09-11 | `/private/tmp/tto-kvupd-venv/bin/python -m pytest test/test_model.py test/test_dense_layer_demo.py` | PASS, 26 tests after reserving INT2 compute and promoting INT2 dense-layer inputs to INT4 execution. |
+| 2026-09-11 | `make -C test` | PASS, 11 TinyTapeout-wrapper cocotb RTL tests after reserving INT2 compute. |
+| 2026-09-11 | GitHub Actions `test` run 34568845296 | PASS, Ubuntu cocotb regression on commit `a4b9709`. |
+| 2026-09-11 | GitHub Actions `gds` run 34568845277 | PASS, official TinyTapeout `1x1` GDS build, precheck, gate-level test, and viewer generation on commit `a4b9709`. Final routed utilization 95.304%, route DRC 0, Magic DRC 0, LVS 0, antenna violations 0, setup violations 0, hold violations 0. |
 | 2026-08-31 | TinyTapeout IHP template integration | Added `src/config.json`, `docs/info.md`, CI workflows, and `test/Makefile` for `TinyTapeout/tt-gds-action@ttihp26b`. Local cocotb remains blocked until cocotb is installed. |
 | 2026-09-01 | `TO_STEP=KLayout.DRC RUN_TAG=stage3b-64b-klayout-drc scripts/synth.sh` | PASS locally. Magic DRC errors 0, KLayout DRC errors 0, route DRC errors 0, antenna violations 0, setup/hold WNS 0 under generic fallback SDC. |
 | 2026-09-01 | GitHub Actions smoke workflow | BLOCKED before job creation. A minimal `echo ok` workflow also ended `startup_failure`, confirming the current blocker is repository/account Actions startup rather than TinyTapeout workflow content. |
@@ -643,3 +678,496 @@ Decision: keep the config control subops. They are low-cost, useful for software
 - Physical status: unchanged from `stage3b-config-control-klayout-drc`
 
 The cleanup before public Actions keeps `docs/isa.md` as the canonical ISA document, shortens the README, adds `docs/status.md`, and updates CI/local test scripts to include the dense-layer Python regression.
+
+## 1x1 Target, 2 Rows Per Bank Detail
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Flow: model/example pytest, cocotb RTL simulation, and LibreLane Classic stopped at `Yosys.Synthesis`
+- Feature change: reduced each bank from four 8-bit rows to two 8-bit rows while preserving two channels and two banks per channel
+- Official TinyTapeout tile setting: `1x1`
+- Storage geometry: 2 channels x 2 banks/channel x 2 rows/bank x 8 bits/row = 64 bits
+- Model/example tests: 23 pass, 0 fail
+- Cocotb TinyTapeout-wrapper RTL tests: 11 pass, 0 fail
+- Lint errors: 0
+- Lint timing construct errors: 0
+- Lint warnings: 0
+- Cells: 4815
+- Sequential cells: 455 `sg13g2_dfrbpq_1`
+- Total mapped area: 65116.0566
+- Sequential area: 22289.9040
+
+Decision: two rows per bank is a clean first reduction and preserves the desired 2-channel, 2-bank framing, but it is unlikely to fit the official 1x1 TinyTapeout IHP wrapper by itself. The previous official 1x1 run had a 28941.494 um^2 core area; this synthesis checkpoint is still about 2.25x that area before placement overhead.
+
+## 1x1 Target Official GDS Attempt
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Commit: `b5bf3d8`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 64692.432 um^2
+- GPL movable instances area after pin-density adjustment: 74320.634 um^2
+- GPL utilization: 256.796%
+- Failure: `[GPL-0301] Utilization 256.796 % exceeds 100%.`
+
+Decision: layout tuning is not enough for the current reduced-depth RTL. To fit a 1x1 coupon while preserving two channels and two banks per channel, the next experiment needs to remove or substantially simplify logic, not just shrink row storage. Likely cuts are STREAM control, secondary vector/reduction operations, command queueing, or configurable refresh state.
+
+## 1x1 Target Without Autonomous Row-Walk
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Feature change: removed the autonomous `STREAM.DOT`/`STREAM.MAC` control path and reserved opcode `0x7`
+- Preserved geometry: 2 channels x 2 banks/channel x 2 rows/bank x 8 bits/row
+- Preserved PIM operations: `VXOR`, `VAND`, `VOR`, `VADD`, `VSUB`, `DOT`, `MAC`, `SUM`, `POPCNT`, `XNORDOT`, and accumulator byte reads
+- Host impact: multi-row dot products now use explicit `ACT` plus `DOT`/`MAC` commands per row pair
+- Local model/example tests: 24 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 11 pass, 0 fail
+- Run tag: `1x1-2rows-no-stream-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 4102
+- Sequential cells: 429 `sg13g2_dfrbpq_1`
+- Total mapped area: 56587.9608
+- Sequential area: 21016.1952
+
+Compared with the prior 2-row branch checkpoint, removing autonomous row-walk control saves 713 mapped cells and 8528.0958 mapped area. The synthesis area is still about 1.96x the official 28941.494 um^2 1x1 core area before placement overhead, so the next hard check is the official TinyTapeout GDS flow on this branch.
+
+## 1x1 Target Without Autonomous Row-Walk Official GDS Attempt
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Commit: `245d3bc`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 56400.624 um^2
+- GPL movable instances area after pin-density adjustment: 64113.250 um^2
+- GPL utilization: 221.527%
+- Failure: `[GPL-0301] Utilization 221.527 % exceeds 100%.`
+
+Decision: removing autonomous row-walk control helps materially but is not enough for a 1x1 coupon while preserving two channels and two banks per channel. The next experiment needs another functional simplification, with the largest remaining candidates being secondary vector/reduction operations, command queueing, configurable refresh state, or the width/precision of the accumulator datapath.
+
+## 1x1 Target RTL Slimming
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Feature change: preserved the no-STREAM ISA but narrowed internal queued command state, reduced the PIM busy counter from 8 bits to 4 bits, and replaced the retained active opcode with a one-bit VOP/REDUCE state
+- Local model/example tests: 24 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 11 pass, 0 fail
+- Run tag: `1x1-2rows-no-stream-rtl-slim-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 4127
+- Sequential cells: 419 `sg13g2_dfrbpq_1`
+- Total mapped area: 56234.3796
+- Sequential area: 20526.3072
+
+Compared with the no-STREAM baseline, this saves 353.5812 mapped area and 10 sequential cells, but increases total cell count by 25 due to changed combinational mapping. A more aggressive same-ISA experiment that made VOP write back immediately was rejected because it worsened mapped area to 56977.7544 despite reducing sequential cells.
+
+Decision: straightforward RTL cleanup is not enough to make 1x1 viable. The remaining gap is still roughly 56234.3796 / 28941.494 = 1.94x before placement overhead, so the next useful experiments need architectural simplification rather than placement-only tuning or small coding-style changes.
+
+## 1x1 Target RTL Slimming Official GDS Attempt
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Commit: `8df3e8e`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 54983.578 um^2
+- GPL movable instances area after pin-density adjustment: 62326.882 um^2
+- GPL utilization: 215.355%
+- Failure: `[GPL-0301] Utilization 215.355 % exceeds 100%.`
+
+Decision: the area-efficiency refactor reduced official adjusted movable area by 1786.368 um^2 versus the no-STREAM checkpoint, but the design still requires about 2.15x the legal placement area for a 1x1 tile. This confirms that normal RTL cleanup and placement/layout tuning cannot close the remaining gap by themselves.
+
+## 1x1 Target Minimal PU
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Feature change: removed secondary PU operations `VAND`, `VOR`, `VSUB`, `SUM`, `POPCNT`, and `XNORDOT`; their subopcodes are now reserved and set sticky error
+- Preserved geometry: 2 channels x 2 banks/channel x 2 rows/bank x 8 bits/row
+- Preserved PIM operations: `VXOR`, `VADD`, `DOT`, `MAC`, and accumulator byte reads
+- Local model/example tests: 23 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 11 pass, 0 fail
+- Run tag: `1x1-2rows-min-pu-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 3577
+- Sequential cells: 419 `sg13g2_dfrbpq_1`
+- Total mapped area: 51352.8120
+- Sequential area: 20526.3072
+
+Compared with the prior no-STREAM RTL slimming checkpoint, cutting the secondary PU operations saves 550 mapped cells and 4881.5676 mapped area. This is a meaningful reduction but still roughly 51352.8120 / 28941.494 = 1.77x the official 1x1 core area before placement overhead, so further architectural cuts are likely still required unless the official GDS flow reports an unexpectedly better placement picture.
+
+## 1x1 Target Minimal PU Official GDS Attempt
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Commit: `b0a584b`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 50973.754 um^2
+- GPL movable instances area after pin-density adjustment: 57484.340 um^2
+- GPL utilization: 198.623%
+- Failure: `[GPL-0301] Utilization 198.623 % exceeds 100%.`
+
+Decision: removing the secondary PU operations improves official adjusted movable area by 4842.542 um^2 versus the RTL-slimming checkpoint, but the design is still about 1.99x the legal placement area for a 1x1 tile. Continue cutting architectural support logic while preserving two channels, two banks per channel, and a near-bank PU with a minimal PIM command set.
+
+## 1x1 Target Fixed Refresh Timing
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Feature change: removed programmable refresh reload write/read state; automatic refresh now uses a fixed 255-core-clock interval while preserving auto-refresh enable read/write and forced `REF`
+- Preserved geometry: 2 channels x 2 banks/channel x 2 rows/bank x 8 bits/row
+- Preserved PIM operations: `VXOR`, `VADD`, `DOT`, `MAC`, and accumulator byte reads
+- Local model/example tests: 23 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 11 pass, 0 fail
+- Run tag: `1x1-2rows-fixed-refresh-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 3488
+- Sequential cells: 403 `sg13g2_dfrbpq_1`
+- Total mapped area: 49655.8944
+- Sequential area: 19742.4864
+
+Compared with the minimal-PU checkpoint, fixing refresh timing saves 89 mapped cells, 16 sequential cells, and 1696.9176 mapped area. The remaining gap is still large, so command queueing or compute precision width are now the likely next cuts if official GDS remains well over 100%.
+
+## 1x1 Target Fixed Refresh Timing Official GDS Attempt
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Commit: `1f772d8`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 48722.083 um^2
+- GPL movable instances area after pin-density adjustment: 54550.334 um^2
+- GPL utilization: 188.485%
+- Failure: `[GPL-0301] Utilization 188.485 % exceeds 100%.`
+
+Decision: fixed refresh timing improved official adjusted movable area by 2934.006 um^2 versus the minimal-PU checkpoint. The design is still 1.88x the legal placement area, so the next cut should remove command queueing and reject new commands while the PIM datapath is busy.
+
+## 1x1 Target Without Command Queueing
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Feature change: removed the one-entry command queue; commands issued while the selected channel PIM datapath is busy are dropped and set sticky error
+- Preserved geometry: 2 channels x 2 banks/channel x 2 rows/bank x 8 bits/row
+- Preserved PIM operations: `VXOR`, `VADD`, `DOT`, `MAC`, and accumulator byte reads
+- Local model/example tests: 23 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 10 pass, 0 fail
+- Run tag: `1x1-2rows-no-queue-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 3088
+- Sequential cells: 355 `sg13g2_dfrbpq_1`
+- Total mapped area: 44158.6026
+- Sequential area: 17391.0240
+
+Compared with the fixed-refresh checkpoint, removing command queueing saves 400 mapped cells, 48 sequential cells, and 5497.2918 mapped area. This is the largest single 1x1-target cut after removing STREAM, but the design still remains above the 1x1 core area before placement overhead.
+
+## 1x1 Target Without Command Queueing Official GDS Attempt
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Commit: `6a059e9`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 43505.683 um^2
+- GPL movable instances area after pin-density adjustment: 48936.340 um^2
+- GPL utilization: 169.087%
+- Failure: `[GPL-0301] Utilization 169.087 % exceeds 100%.`
+
+Decision: removing command queueing improved official adjusted movable area by 5613.994 um^2 versus the fixed-refresh checkpoint. The design remains 1.69x the legal placement area, so fitting 1x1 now likely requires simplifying the variable-precision compute datapath itself.
+
+## Rejected 1x1 Shared-Lane VADD Refactor
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Experiment: moved `VADD` from a decode-time packed lane add into the same operand-register and lane-counter path used by `DOT`/`MAC`
+- Preserved behavior: `VXOR`, variable-precision `VADD`, variable-precision `DOT`/`MAC`, and accumulator byte reads
+- Local model/example tests: 23 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 10 pass, 0 fail
+- Run tag: `1x1-2rows-shared-vadd-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 3415
+- Sequential cells: 357 `sg13g2_dfrbpq_1`
+- Total mapped area: 47225.5056
+- Sequential area: 17489.0016
+
+Decision: reject this implementation. It is architecturally cleaner, but the lane-insertion muxing and extra active-op state increase area by 327 cells and 3066.9030 mapped area versus the current no-queue checkpoint. Keep the existing packed `VADD` implementation unless a deeper PU rewrite can share more arithmetic without adding result-lane mux cost.
+
+## 1x1 Target Immediate VOP Refactor
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Feature change: removed delayed VOP writeback state; `VXOR` and `VADD` now update the destination active row at command decode time, while `DOT`/`MAC` remain the only multi-cycle PIM operations
+- Preserved geometry: 2 channels x 2 banks/channel x 2 rows/bank x 8 bits/row
+- Preserved PIM operations: `VXOR`, `VADD`, `DOT`, `MAC`, and accumulator byte reads
+- Preserved compute precision: `DOT` and `MAC` still support INT1/INT2/INT4/INT8; `VADD` still supports INT2/INT4/INT8
+- Local model/example tests: 23 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 10 pass, 0 fail
+- Run tag: `1x1-2rows-immediate-vop-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 2957
+- Sequential cells: 335 `sg13g2_dfrbpq_1`
+- Total mapped area: 42207.8202
+- Sequential area: 16411.2480
+
+Compared with the no-command-queue checkpoint, immediate VOP saves 131 mapped cells, 20 sequential cells, and 1950.7824 mapped area. This is a keeper: it makes the PU boundary cleaner by separating immediate row transforms from the multi-cycle reduction datapath and also improves area.
+
+## 1x1 Target Immediate VOP Official GDS Attempt
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Commit: `031c97c`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 41899.939 um^2
+- GPL movable instances area after pin-density adjustment: 47553.089 um^2
+- GPL utilization: 164.308%
+- Failure: `[GPL-0301] Utilization 164.308 % exceeds 100%.`
+
+Decision: immediate VOP improved official adjusted movable area by 1383.251 um^2 versus the no-command-queue checkpoint, but the design is still 1.64x the legal placement area. Continue reducing the retained DOT/MAC datapath and command state while preserving the two-channel, two-bank DRAM-PIM controller framing.
+
+## 1x1 Target Active-Bank PU State Refactor
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Feature change: replaced retained DOT/MAC operand row flops with active bank selectors, then narrowed the DOT/MAC busy counter and lane index to their true ranges
+- Preserved geometry: 2 channels x 2 banks/channel x 2 rows/bank x 8 bits/row
+- Preserved PIM operations: `VXOR`, `VADD`, `DOT`, `MAC`, and accumulator byte reads
+- Preserved compute precision: `DOT` and `MAC` still support INT1/INT2/INT4/INT8; `VADD` still supports INT2/INT4/INT8
+- Local model/example tests: 23 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 10 pass, 0 fail
+- Run tag: `1x1-2rows-bank-counter-slim-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 2960
+- Sequential cells: 303 `sg13g2_dfrbpq_1`
+- Total mapped area: 42126.3990
+- Sequential area: 14843.6064
+
+Compared with the immediate-VOP checkpoint, active-bank PU state saves 28 sequential cells and 81.4212 mapped area, while total mapped cell count rises by 3. The result is small but positive and makes the DOT/MAC state more explicit: the operation retains which banks are active rather than copying both operand rows into extra flops.
+
+## 1x1 Target Active-Bank PU State Official GDS Attempt
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Commit: `322bfd7`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 40370.400 um^2
+- GPL movable instances area after pin-density adjustment: 45631.495 um^2
+- GPL utilization: 157.668%
+- Failure: `[GPL-0301] Utilization 157.668 % exceeds 100%.`
+
+Decision: reducing retained PU state improved official adjusted movable area by 1921.594 um^2 versus the immediate-VOP checkpoint. This confirms the modular active-bank DOT/MAC state is worth keeping, but the design still needs roughly a further 36.6% reduction in adjusted placement demand to fit a 1x1 tile.
+
+## Rejected 1x1 Serial-Multiply PU Experiment
+
+- Date: 2026-09-05
+- Branch: `1x1-target`
+- Experiment: replaced the single-cycle signed lane multiplier with a multi-cycle absolute-value shift/add product stage
+- Preserved behavior: `DOT` and `MAC` still supported INT1/INT2/INT4/INT8, with INT1 as a popcount and wider precisions stretched to eight busy cycles per row
+- Local model/example tests: 23 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 10 pass, 0 fail
+- Run tag: `1x1-2rows-serial-mul-pu-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 1 warning
+- Cells: 2911
+- Sequential cells: 341 `sg13g2_dfrbpq_1`
+- Total mapped area: 43047.6228
+- Sequential area: 16705.1808
+
+Decision: reject this implementation. The shift/add version lowers total cell count by 49 versus the active-bank PU state checkpoint, but the extra staging flops and control increase mapped area by 921.2238 and reintroduce a lint warning. For this small row width, the synthesized single-cycle lane multiplier is cheaper than the extra serial product state.
+
+## 1x1 Target Without INT8 Compute
+
+- Date: 2026-09-06
+- Branch: `1x1-target`
+- Feature change: reserved INT8 for `VADD`, `DOT`, and `MAC`; retained INT1/INT2/INT4 compute precision and kept INT8 `VXOR` as bitwise row XOR
+- Preserved geometry: 2 channels x 2 banks/channel x 2 rows/bank x 8 bits/row
+- Preserved PIM operations: `VXOR`, `VADD`, `DOT`, `MAC`, and accumulator byte reads
+- Preserved compute precision: `DOT` and `MAC` still support INT1/INT2/INT4; `VADD` still supports INT2/INT4
+- Local model/example tests: 24 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 10 pass, 0 fail
+- Run tag: `1x1-drop-int8-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 2243
+- Sequential cells: 303 `sg13g2_dfrbpq_1`
+- Total mapped area: 33846.9138
+- Sequential area: 14843.6064
+
+Compared with the active-bank PU state checkpoint, dropping INT8 compute saves 717 mapped cells and 8279.4852 mapped area while preserving the two-channel, two-bank, near-bank-PU architecture. This is the largest remaining single compute-datapath cut measured so far.
+
+## 1x1 Target Without INT8 Compute Official GDS Attempt
+
+- Date: 2026-09-06
+- Branch: `1x1-target`
+- Commit: `e828339`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 32537.635 um^2
+- GPL movable instances area after pin-density adjustment: 36391.518 um^2
+- GPL utilization: 125.742%
+- Failure: `[GPL-0301] Utilization 125.742 % exceeds 100%.`
+
+Decision: reserving INT8 compute improved official adjusted movable area by 9239.977 um^2 versus the active-bank PU state checkpoint, moving the 1x1 target from 157.668% to 125.742% utilization. The branch is still too large for the official 1x1 wrapper, but this cut closes most of the remaining gap without giving up two channels, two banks per channel, or variable-precision near-bank compute.
+
+## 1x1 Target 14-Bit Accumulator
+
+- Date: 2026-09-06
+- Branch: `1x1-target`
+- Feature change: narrowed each channel accumulator from 18 bits to 14 bits; `ACC` byte 1 now returns zero-extended bits `[13:8]`, and byte 2 returns zero
+- Preserved geometry: 2 channels x 2 banks/channel x 2 rows/bank x 8 bits/row
+- Preserved PIM operations: `VXOR`, `VADD`, `DOT`, `MAC`, and accumulator byte reads
+- Preserved compute precision: `DOT` and `MAC` still support INT1/INT2/INT4; `VADD` still supports INT2/INT4
+- Local model/example tests: 24 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 10 pass, 0 fail
+- Run tag: `1x1-acc14-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 2110
+- Sequential cells: 295 `sg13g2_dfrbpq_1`
+- Total mapped area: 32484.2616
+- Sequential area: 14451.6960
+
+Compared with the INT8-reserved checkpoint, the 14-bit accumulator saves 133 mapped cells, 8 sequential cells, 1362.6522 mapped area, and 391.9104 sequential area. This is a worthwhile cut because INT1/INT2/INT4 row-dot accumulation still has headroom for the tiny two-row-per-bank target, while the expensive high bits no longer consume flops and adder logic.
+
+## 1x1 Target 14-Bit Accumulator Official GDS Attempt
+
+- Date: 2026-09-06
+- Branch: `1x1-target`
+- Commit: `71a5a18`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 31222.195 um^2
+- GPL movable instances area after pin-density adjustment: 34813.869 um^2
+- GPL utilization: 120.291%
+- Failure: `[GPL-0301] Utilization 120.291 % exceeds 100%.`
+
+Decision: narrowing the accumulators improved official adjusted movable area by 1577.649 um^2 versus the INT8-reserved checkpoint, moving the 1x1 target from 125.742% to 120.291% utilization. The design is still too large for one official TinyTapeout IHP tile, but this cut preserved the dual-channel, dual-bank geometry and INT1/INT2/INT4 near-bank DOT/MAC behavior.
+
+## 1x1 Target Shared PU
+
+- Date: 2026-09-07
+- Branch: `1x1-target`
+- Feature change: replaced the duplicated per-channel PIM arithmetic datapaths with one shared lane-serial PU multiplexed between channels; per-channel banks, refresh state, sticky error, and 14-bit accumulators remain
+- Preserved geometry: 2 channels x 2 banks/channel x 2 rows/bank x 8 bits/row
+- Preserved PIM operations: `VXOR`, `VADD`, `DOT`, `MAC`, and accumulator byte reads
+- Preserved compute precision: `DOT` and `MAC` still support INT1/INT2/INT4; `VADD` still supports INT2/INT4
+- Behavioral tradeoff: only one multi-cycle PIM operation can execute globally at a time; a PIM command issued while the shared PU is busy is dropped and sets sticky error
+- Local model/example tests: 24 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 10 pass, 0 fail
+- Run tag: `1x1-shared-pu-slim-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 1674
+- Sequential cells: 287 `sg13g2_dfrbpq_1`
+- Total mapped area: 28317.1140
+- Sequential area: 14059.7856
+- Local global-placement run tag: `1x1-shared-pu-slim-gpl`
+- Local standalone global-placement utilization: 49.732% under the local/default floorplan
+
+Compared with the 14-bit-accumulator checkpoint, sharing the PU saves 436 mapped cells, 8 sequential cells, 4167.1476 mapped area, and 391.9104 sequential area. This is the largest remaining structural reduction compatible with preserving two logical channels, two banks per channel, and the INT1/INT2/INT4 near-bank compute ISA.
+
+## 1x1 Target Shared PU Official GDS Attempt
+
+- Date: 2026-09-07
+- Branch: `1x1-target`
+- Commit: `596bd06`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 28311.898 um^2
+- GPL movable instances area after pin-density adjustment: 30893.977 um^2
+- GPL utilization: 106.746%
+- Failure: `[GPL-0301] Utilization 106.746 % exceeds 100%.`
+
+Decision: sharing one PU between channels improved official adjusted movable area by 3919.892 um^2 versus the 14-bit-accumulator checkpoint, moving the 1x1 target from 120.291% to 106.746% utilization. This is close enough that the next cut should be a small control/datapath simplification, not a larger feature removal. Do not add a queued PIM command yet; the current design still needs about 1952.483 um^2 of official adjusted placement reduction before there is real margin for backpressure buffering.
+
+## 1x1 Target No Debug Output Pins and Layout Knobs
+
+- Date: 2026-09-07
+- Branch: `1x1-target`
+- Feature change: tied `uo_out[7:1]` low and kept only SPI MISO on `uo_out[0]`; status remains available through SPI `STATUS` frames
+- Config change: mirrored low-risk 1x1 placement knobs into `config.yaml`: 60% placement target density, zero global/detailed placement cell padding, disabled output-port repair buffering, and allowed congested global routing
+- Preserved geometry: 2 channels x 2 banks/channel x 2 rows/bank x 8 bits/row
+- Preserved PIM operations: `VXOR`, `VADD`, `DOT`, `MAC`, and accumulator byte reads
+- Preserved compute precision: `DOT` and `MAC` still support INT1/INT2/INT4; `VADD` still supports INT2/INT4
+- Local model/example tests: 24 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 10 pass, 0 fail
+- Run tags: `1x1-no-debug-uopins-synth`, `1x1-layout-knobs-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 1679
+- Sequential cells: 287 `sg13g2_dfrbpq_1`
+- Total mapped area: 28317.1518
+- Sequential area: 14059.7856
+
+Compared with the shared-PU checkpoint, tying off the debug outputs and adding placement knobs did not reduce mapped logic area; the total mapped area changed by only 0.0378. This is still worth checking in the official TinyTapeout flow because the previous failure included a pin-density area adjustment, but it should not be treated as enough margin for adding a queued PIM buffer.
+
+## 1x1 Target No Debug Output Pins and Layout Knobs Official GDS Attempt
+
+- Date: 2026-09-07
+- Branch: `1x1-target`
+- Commit: `0c8db3a`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 28340.928 um^2
+- Pin density area adjust: 2488.887 um^2
+- GPL movable instances area after pin-density adjustment: 30829.815 um^2
+- GPL utilization: 106.525%
+- Failure: `[GPL-0301] Utilization 106.525 % exceeds 100%.`
+
+Decision: tying off the spare output pins and mirroring low-risk placement knobs improved official adjusted movable area by only 64.162 um^2 versus the shared-PU checkpoint, moving the 1x1 target from 106.746% to 106.525%. This confirms that placement-only tuning is not enough. The design still needs about 1888.321 um^2 of official adjusted placement reduction before it fits, and more than that before adding a queued PIM buffer would be responsible.
+
+## 1x1 Target Without VXOR
+
+- Date: 2026-09-07
+- Branch: `1x1-target`
+- Feature change: reserved `VOP` subopcode 0, removing `VXOR` from the current area-reduced ISA
+- Preserved geometry: 2 channels x 2 banks/channel x 2 rows/bank x 8 bits/row
+- Preserved PIM operations: `VADD`, `DOT`, `MAC`, and accumulator byte reads
+- Preserved compute precision: `DOT` and `MAC` still support INT1/INT2/INT4; `VADD` still supports INT2/INT4
+- Local model/example tests: 24 pass, 0 fail
+- Local cocotb TinyTapeout-wrapper RTL tests: 10 pass, 0 fail, including reserved `VOP` subopcode 0
+- Run tag: `1x1-no-vxor-synth`
+- Synthesis result: pass through `Yosys.Synthesis`
+- Lint: 0 errors, 0 warnings
+- Cells: 1654
+- Sequential cells: 287 `sg13g2_dfrbpq_1`
+- Total mapped area: 28345.7664
+- Sequential area: 14059.7856
+
+Compared with the no-debug-output-pin checkpoint, removing `VXOR` reduced the mapped cell count by 25 but increased mapped area by 28.6146 because the standard-cell mix changed. This is not a local synthesis-area win, but the official TinyTapeout flow should still be checked once to see whether the lower cell/net count improves the 1x1 placement adjustment.
+
+## 1x1 Target Without VXOR Official GDS Attempt
+
+- Date: 2026-09-07
+- Branch: `1x1-target`
+- Commit: `1cd30c5`
+- GitHub Actions `test`: pass
+- GitHub Actions `gds`: fail at `OpenROAD.GlobalPlacement`
+- Official core area: 28941.494 um^2
+- Floorplan total instances area: 28106.870 um^2
+- Pin density area adjust: 2527.802 um^2
+- GPL movable instances area after pin-density adjustment: 30634.672 um^2
+- GPL utilization: 105.850%
+- Failure: `[GPL-0301] Utilization 105.850 % exceeds 100%.`
+
+Decision: reserving `VOP` subopcode 0 improved official adjusted movable area by 195.143 um^2 versus the no-debug-output-pin checkpoint, moving the 1x1 target from 106.525% to 105.850%. This is directionally useful but much smaller than the remaining gap: the design still needs about 1693.178 um^2 of official adjusted placement reduction to fit before any margin is available.

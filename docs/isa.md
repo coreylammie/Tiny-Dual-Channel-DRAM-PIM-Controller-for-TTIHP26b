@@ -13,12 +13,12 @@ Commands are fixed 32-bit SPI words, MSB first. Responses are shifted out on the
 | 21 | bank A |
 | 20 | bank B / destination |
 | 19:18 | row A |
-| 17:16 | row B |
+| 17:16 | reserved row B field |
 | 15:11 | reserved |
 | 10:8 | flags |
 | 7:0 | immediate data |
 
-The current 128-bit geometry implements all encoded row values 0 through 3.
+The reduced `1x1` target geometry implements row values 0 through 1 for `row A`. Row values 2 and 3 are encoded but currently invalid. The current RTL operates on the active row of `bank B`, so bits 17:16 are reserved for future row-walk or direct row-pair operations.
 
 ## Opcodes
 
@@ -31,54 +31,40 @@ The current 128-bit geometry implements all encoded row values 0 through 3.
 | 0x4 | WR | Writes `imm8` to active row in `bank A` |
 | 0x5 | VOP | Vector PIM operation selected by `subopcode` |
 | 0x6 | REDUCE | Reduction PIM operation selected by `subopcode` |
-| 0x7 | STREAM | Autonomous row-pair stream selected by `subopcode` |
+| 0x7 | RESERVED | Reserved; sets sticky error |
 | 0x8 | ACC | Reads accumulator byte selected by `subopcode[1:0]` |
 | 0x9 | REF | Forces refresh on `bank A` |
 | 0xA | STATUS | Reads channel status |
-| 0xB | CONFIG | Configuration operation selected by `subopcode` |
+| 0xB | CONFIG | Reserved in the 1x1 fitting branch; sets sticky error |
 | 0xC | ABORT | Clears sticky error and refresh state |
 
 ## Precision
 
-`00` is INT1, `01` is INT2, `10` is INT4, and `11` is INT8.
+`00` is INT1, `01` is INT2, `10` is INT4, and `11` is INT8. The reduced `1x1` target reserves INT2 and INT8 for compute commands; INT2/INT8 `ATTEND`, `DOT`, and `MAC` set sticky error. Software may still declare INT2 quantized tensors and promote them to INT4 command execution.
 
 ## PU Suboperations
 
-`VOP` uses the two active rows selected by `bank A` and `bank B`. Both banks must be open and not refreshing. `flags[0]` selects the destination bank for writeback.
+`VOP` uses the two active rows selected by `bank A` and `bank B`. Both banks must be open and not refreshing. `ATTEND` writes back to the active row in `bank B` and requires `flags == 0`; nonzero flags are reserved and set sticky error.
 
 | Opcode | Subopcode | Mnemonic | Precision | Side effect |
 |---|---:|---|---|---|
-| VOP | 0 | VXOR | INT1/2/4/8 | bitwise XOR writes destination active row |
-| VOP | 1 | VADD | INT2/4/8 | lane-wise wraparound add writes destination active row |
-| VOP | 2 | VAND | INT1/2/4/8 | bitwise AND writes destination active row |
-| VOP | 3 | VOR | INT1/2/4/8 | bitwise OR writes destination active row |
-| VOP | 4 | VSUB | INT2/4/8 | lane-wise wraparound subtract writes destination active row |
-| REDUCE | 0 | DOT | INT1/2/4/8 | writes 18-bit accumulator |
-| REDUCE | 1 | MAC | INT1/2/4/8 | accumulates dot product into 18-bit accumulator |
-| REDUCE | 2 | SUM | INT1/2/4/8 | sums active `bank A` row lanes into 18-bit accumulator |
-| REDUCE | 3 | POPCNT | INT1 | popcounts active `bank A` row into 18-bit accumulator |
-| REDUCE | 4 | XNORDOT | INT1 | writes `2 * popcount(XNOR(A,B)) - 8` into 18-bit accumulator |
-| STREAM | 0 | STREAM.DOT | INT1/2/4/8 | clears accumulator, then DOTs consecutive row pairs |
-| STREAM | 1 | STREAM.MAC | INT1/2/4/8 | preserves accumulator, then MACs consecutive row pairs |
+| VOP | 0 | RESERVED | - | sets sticky error |
+| VOP | 1 | RESERVED | - | sets sticky error |
+| VOP | 2 | ATTEND | INT4 | updates output/state row as `bank B = bank B + bank A * ACC_low`, lane-wise wraparound |
+| VOP | 3-7 | RESERVED | - | sets sticky error |
+| REDUCE | 0 | DOT | INT1/4 | writes 8-bit accumulator |
+| REDUCE | 1 | MAC | INT1/4 | accumulates dot product into 8-bit accumulator |
+| REDUCE | 2-7 | RESERVED | - | sets sticky error |
 
-`DOT.INT1` and `MAC.INT1` treat row bits as unsigned `{0,1}` lanes. `DOT.INT2/4/8` and `MAC.INT2/4/8` use signed two's-complement lanes. The RTL computes INT1 as a one-cycle bit-popcount term and computes INT2/4/8 through one signed lane product per busy cycle. `DOT` clears the accumulator before adding the dot product; `MAC` preserves the existing accumulator and adds into it.
+`DOT.INT1` and `MAC.INT1` treat row bits as unsigned `{0,1}` lanes. `DOT.INT4`, `MAC.INT4`, and `ATTEND.INT4` use signed two's-complement lanes. `ATTEND` broadcasts the selected channel accumulator's low INT4 lane as the score multiplier. The RTL computes INT1 reductions as a one-cycle bit-popcount term and computes INT4 reductions and attention updates through one signed lane product per busy cycle. `DOT` clears the selected channel accumulator before adding the dot product; `MAC` preserves the selected channel accumulator and adds into it. Both channels share one arithmetic PU, so only one multi-cycle PIM operation can be active at a time.
 
-All `REDUCE` operations require both selected banks to be open and not refreshing. `SUM` and `POPCNT` consume only the active `bank A` row, but still use that shared REDUCE readiness check.
+All `REDUCE` operations require both selected banks to be open and not refreshing. Multi-row dot products are host-driven by activating each row pair and issuing `DOT` for the first row pair followed by `MAC` for subsequent row pairs.
 
-`STREAM` uses `imm8[2:0]` as a row-pair count from 1 through 4. `row A` and `row B` are the starting rows for `bank A` and `bank B`; each streamed row pair increments both row indices by one. Commands with count 0, unsupported stream subopcodes, or start/count combinations that run past row 3 set sticky error.
-
-`ACC` returns accumulator byte 0, 1, or 2 using `subopcode[1:0]`. `subopcode == 4` clears the accumulator after returning byte 0.
+`ACC` returns accumulator byte 0, or zero for higher byte selections using `subopcode[1:0]`. `subopcode == 4` clears the accumulator after returning byte 0.
 
 ## Configuration
 
-| CONFIG Subopcode | Mnemonic | Response | Behavior |
-|---:|---|---|---|
-| 0 | REF_RELOAD_WR | none | sets automatic refresh reload counter to `imm8` |
-| 1 | REF_RELOAD_RD | reload value | returns automatic refresh reload counter |
-| 2 | REF_AUTO_WR | none | sets automatic refresh enable from `imm8[0]` |
-| 3 | REF_AUTO_RD | bit 0 | returns automatic refresh enable |
-
-The effective refresh interval is `reload + 1` core clocks because the counter reloads after reaching zero. Reset uses reload value 254 and automatic refresh enabled, giving the default 255-core-clock automatic refresh interval. `REF_AUTO_WR` disables only automatic refresh scheduling; forced `REF` commands still work. Unsupported `CONFIG` subopcodes set sticky error.
+`CONFIG` is reserved in the 1x1 fitting branch and sets sticky error. Refresh is host-driven with explicit `REF` commands.
 
 ## Response Word
 
@@ -105,10 +91,10 @@ For ordinary command acknowledgements without read data, the top level returns:
 | Bit | Meaning |
 |---|---|
 | 7 | sticky error |
-| 6 | refresh overdue |
-| 5 | refresh pending |
+| 6 | reserved, reads zero |
+| 5 | reserved, reads zero |
 | 4 | refresh busy |
 | 3 | PIM busy |
 | 2 | bank 1 open |
 | 1 | bank 0 open |
-| 0 | pending command queued |
+| 0 | reserved, reads zero |

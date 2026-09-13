@@ -16,17 +16,17 @@ own SPI slave on top of those pins.
 | `spi_mosi` | `ui_in[2]` | input | SPI host-to-project data |
 | `spi_miso` | `uo_out[0]` | output | SPI project-to-host data |
 
-The remaining `uo_out` bits expose compact debug status:
+The remaining `uo_out` bits are unused and driven low:
 
 | TinyTapeout pin | Meaning |
 |---|---|
-| `uo_out[1]` | channel 0 bank 0 open |
-| `uo_out[2]` | channel 0 bank 1 open |
-| `uo_out[3]` | channel 0 refresh busy |
-| `uo_out[4]` | channel 1 bank 0 open |
-| `uo_out[5]` | channel 1 bank 1 open |
-| `uo_out[6]` | channel 1 refresh busy |
-| `uo_out[7]` | enable monitor |
+| `uo_out[1]` | unused |
+| `uo_out[2]` | unused |
+| `uo_out[3]` | unused |
+| `uo_out[4]` | unused |
+| `uo_out[5]` | unused |
+| `uo_out[6]` | unused |
+| `uo_out[7]` | unused |
 
 `uio[7:0]` is unused and driven with output-enable low.
 

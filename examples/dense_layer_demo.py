@@ -1,9 +1,10 @@
 """Dense-layer inference demo using the Tiny DRAM-PIM controller model.
 
-The hardware DOT command has one precision field, so mixed activation/weight
-precision is emulated by promoting each dot-product chunk to the wider lane
+The hardware DOT command has one precision field. This 1x1-focused RTL branch
+executes DOT/MAC at INT1 or INT4, so mixed activation/weight precision is
+emulated by promoting each dot-product chunk to the nearest supported execution
 precision. This keeps arithmetic exact for the supplied quantized values, but
-the memory packing density follows the wider operand.
+the memory packing density follows the execution precision.
 """
 
 from __future__ import annotations
@@ -25,6 +26,10 @@ PRECISION_BITS = {
     isa.Precision.INT2: 2,
     isa.Precision.INT4: 4,
     isa.Precision.INT8: 8,
+}
+SUPPORTED_EXECUTION_PRECISIONS = {
+    isa.Precision.INT1,
+    isa.Precision.INT4,
 }
 
 
@@ -63,11 +68,12 @@ def run_dense_layer(
     model: TinyPimModel | None = None,
     ch: int = 0,
 ) -> DenseRun:
-    """Run a quantized dense layer through the PIM model's STREAM.DOT path.
+    """Run a quantized dense layer through the PIM model's DOT/MAC path.
 
     `weights` is indexed as `[output][input]`. INT1 is treated as unsigned
-    0/1 data, matching the RTL DOT semantics. INT2/INT4/INT8 are signed
-    two's-complement lanes.
+    0/1 data, matching the RTL DOT semantics. INT2 and INT4 are signed
+    two's-complement declared value ranges. INT2 values are promoted to INT4
+    for execution in the area-reduced 1x1 target.
     """
 
     _validate_matrix(activations, weights, bias)
@@ -77,6 +83,8 @@ def run_dense_layer(
 
     pim = TinyPimModel() if model is None else model
     exec_precision = _execution_precision(activation_precision, weight_precision)
+    if exec_precision not in SUPPORTED_EXECUTION_PRECISIONS:
+        raise ValueError("dense layer execution precision must be INT1 or INT4")
     lanes_per_row = 8 // PRECISION_BITS[exec_precision]
     values_per_chunk = lanes_per_row * ROWS_PER_BANK
     bias_values = [0] * len(weights) if bias is None else list(bias)
@@ -118,10 +126,9 @@ def _run_dot_chunk(
     w_values = list(weights) + [0] * (padded_len - len(weights))
 
     if rows_needed < 1 or rows_needed > ROWS_PER_BANK:
-        raise ValueError("dot chunk must use between 1 and 4 rows")
+        raise ValueError(f"dot chunk must use between 1 and {ROWS_PER_BANK} rows")
 
     model.execute(isa.abort(ch))
-    model.execute(isa.config_auto_refresh(ch, False))
     for row in range(rows_needed):
         a_row = _pack_lanes(a_values[row * lanes_per_row : (row + 1) * lanes_per_row], precision)
         w_row = _pack_lanes(w_values[row * lanes_per_row : (row + 1) * lanes_per_row], precision)
@@ -130,11 +137,20 @@ def _run_dot_chunk(
         model.execute(isa.act(ch, 1, row))
         model.execute(isa.wr(ch, 1, w_row))
 
-    model.execute(isa.stream(ch, isa.Reduce.DOT, precision, 0, 1, 0, 0, rows_needed))
+    for row in range(rows_needed):
+        model.execute(isa.act(ch, 0, row))
+        model.execute(isa.act(ch, 1, row))
+        if row == 0:
+            model.execute(isa.reduce_dot(ch, precision, 0, 1))
+        else:
+            model.execute(isa.reduce_mac(ch, precision, 0, 1))
+
     acc0 = model.execute(isa.acc(ch, 0)) or 0
     acc1 = model.execute(isa.acc(ch, 1)) or 0
     acc2 = model.execute(isa.acc(ch, 2)) or 0
-    return _sign_extend(acc0 | (acc1 << 8) | ((acc2 & 0x03) << 16), 18)
+    if acc1 != 0 or acc2 != 0:
+        raise RuntimeError("unexpected nonzero high accumulator byte")
+    return _sign_extend(acc0, 8)
 
 
 def _pack_lanes(values: Sequence[int], precision: isa.Precision) -> int:
@@ -159,7 +175,14 @@ def _execution_precision(
     activation_precision: isa.Precision,
     weight_precision: isa.Precision,
 ) -> isa.Precision:
-    return max(activation_precision, weight_precision, key=lambda precision: PRECISION_BITS[precision])
+    requested = max(
+        activation_precision,
+        weight_precision,
+        key=lambda precision: PRECISION_BITS[precision],
+    )
+    if requested == isa.Precision.INT2:
+        return isa.Precision.INT4
+    return requested
 
 
 def _validate_matrix(

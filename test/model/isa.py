@@ -12,7 +12,7 @@ class Opcode(IntEnum):
     WR = 0x4
     VOP = 0x5
     REDUCE = 0x6
-    STREAM = 0x7
+    RESERVED_7 = 0x7
     ACC = 0x8
     REF = 0x9
     STATUS = 0xA
@@ -28,19 +28,19 @@ class Precision(IntEnum):
 
 
 class Vop(IntEnum):
-    XOR = 0
-    ADD = 1
-    AND = 2
-    OR = 3
-    SUB = 4
+    RESERVED_0 = 0
+    RESERVED_1 = 1
+    ATTEND = 2
+    RESERVED_3 = 3
+    RESERVED_4 = 4
 
 
 class Reduce(IntEnum):
     DOT = 0
     MAC = 1
-    SUM = 2
-    POPCNT = 3
-    XNORDOT = 4
+    RESERVED_2 = 2
+    RESERVED_3 = 3
+    RESERVED_4 = 4
 
 
 @dataclass(frozen=True)
@@ -103,14 +103,6 @@ def abort(ch: int) -> Command:
     return Command(Opcode.ABORT, ch=ch)
 
 
-def config_refresh(ch: int, reload: int) -> Command:
-    return Command(Opcode.CONFIG, ch=ch, subop=0, imm8=reload)
-
-
-def config_read_refresh(ch: int) -> Command:
-    return Command(Opcode.CONFIG, ch=ch, subop=1)
-
-
 def config_auto_refresh(ch: int, enable: bool) -> Command:
     return Command(Opcode.CONFIG, ch=ch, subop=2, imm8=int(enable))
 
@@ -126,6 +118,7 @@ def vop(
     bank_a: int,
     bank_b: int,
     dest_bank: int = 0,
+    imm8: int = 0,
 ) -> Command:
     return Command(
         Opcode.VOP,
@@ -135,6 +128,7 @@ def vop(
         bank_a=bank_a,
         bank_b=bank_b,
         flags=dest_bank & 1,
+        imm8=imm8,
     )
 
 
@@ -160,59 +154,5 @@ def reduce_mac(ch: int, precision: Precision, bank_a: int, bank_b: int) -> Comma
     )
 
 
-def reduce_sum(ch: int, precision: Precision, bank: int) -> Command:
-    return Command(
-        Opcode.REDUCE,
-        ch=ch,
-        subop=Reduce.SUM,
-        precision=precision,
-        bank_a=bank,
-    )
-
-
-def reduce_popcnt(ch: int, bank: int) -> Command:
-    return Command(
-        Opcode.REDUCE,
-        ch=ch,
-        subop=Reduce.POPCNT,
-        precision=Precision.INT1,
-        bank_a=bank,
-    )
-
-
-def reduce_xnordot(ch: int, bank_a: int, bank_b: int) -> Command:
-    return Command(
-        Opcode.REDUCE,
-        ch=ch,
-        subop=Reduce.XNORDOT,
-        precision=Precision.INT1,
-        bank_a=bank_a,
-        bank_b=bank_b,
-    )
-
-
-def stream(
-    ch: int,
-    subop: Reduce,
-    precision: Precision,
-    bank_a: int,
-    bank_b: int,
-    row_a: int,
-    row_b: int,
-    count: int,
-) -> Command:
-    return Command(
-        Opcode.STREAM,
-        ch=ch,
-        subop=subop,
-        precision=precision,
-        bank_a=bank_a,
-        bank_b=bank_b,
-        row_a=row_a,
-        row_b=row_b,
-        imm8=count,
-    )
-
-
 def acc(ch: int, byte: int = 0) -> Command:
-    return Command(Opcode.ACC, ch=ch, subop=byte & 0x3)
+    return Command(Opcode.ACC, ch=ch, subop=byte & 0x7)

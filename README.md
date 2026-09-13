@@ -2,18 +2,18 @@
 
 This project asks a deliberately small question: how much of a DRAM processing-in-memory controller can fit in a tiny TinyTapeout IHP standard-cell macro?
 
-The result is a tiny dual-channel DRAM-PIM controller with real memory-control behavior, refresh state, command queueing, and cross-bank compute. It is not a density-competitive DRAM macro. It is a silicon-testable controller architecture for near-memory operations under an extreme area budget. The useful idea is the compromise: keep the ISA expressive enough for row moves, status/debug, low-precision vector operations, dot products, MACs, and short row streams, but serialize the expensive arithmetic lanes enough that the design still routes locally.
+The result is a tiny dual-channel DRAM-PIM controller with real memory-control behavior, explicit refresh, and cross-bank compute. It is not a density-competitive DRAM macro. It is a silicon-testable controller architecture for near-memory operations under an extreme area budget. The useful idea is the compromise: keep the ISA expressive enough for row moves, status/debug, dot products, MACs, and experimental attention updates, but serialize or reuse the expensive arithmetic lanes enough that the design can still be evaluated against a TinyTapeout tile.
 
 ## High-Level Design
 
 - **Host interface:** a 32-bit SPI command frame enters through the TinyTapeout `ui_in`/`uo_out` pins. Responses are returned on the following SPI frame with status and read data.
-- **Two independent channels:** each channel has its own control state, refresh timing, sticky error bit, pending command slot, bank pair, and accumulator.
-- **Banked row store:** each channel contains two banks with four 8-bit rows per bank. `ACT`, `PRE`, `WR`, and `RD` expose a DRAM-like open-row programming model.
-- **Near-bank processing unit:** the PU operates across the selected rows in the two banks. It supports bitwise vector ops, lane-wise add/subtract, lane sums, dot products, MAC, popcount, XNOR-dot, and short row streams.
-- **Variable compute resolution:** each compute command selects how an 8-bit row is interpreted: eight INT1 lanes, four signed INT2 lanes, two signed INT4 lanes, or one signed INT8 lane.
-- **Row streaming:** `STREAM.DOT` and `STREAM.MAC` walk up to four consecutive row pairs and accumulate results without requiring one host command per row.
+- **Two independent channels:** each channel has its own control state, forced-refresh state, sticky error bit, bank pair, and 8-bit accumulator.
+- **Banked row store:** each channel contains two banks with two 8-bit rows per bank. `ACT`, `PRE`, `WR`, and `RD` expose a DRAM-like open-row programming model.
+- **Shared near-bank processing unit:** one PU is multiplexed between the two channels. Experimental `ATTEND`, `DOT`, and `MAC` use the shared multi-cycle lane stage.
+- **Variable compute resolution:** each compute command selects how an 8-bit row is interpreted: eight INT1 lanes or two signed INT4 lanes. INT2 and INT8 remain encoded but are reserved for compute in the `1x1` target branch.
+- **Host-driven row sequencing:** multi-row dot products and attention updates are expressed as explicit row activations plus PU commands, preserving the compute primitive while avoiding autonomous row-walk control state.
 
-The implementation keeps the visible ISA relatively expressive, but uses a lane-serial DOT/MAC datapath so the design remains small enough to route in the TinyTapeout IHP area budget.
+The experimental `ATTEND` operation is intended as a tiny analogue of attention-value accumulation: after `DOT` or `MAC` computes an attention score in `ACC`, `ATTEND` updates `bank_b_active_row = bank_b_active_row + bank_a_active_row * ACC_low`, evaluated through the shared lane stage at INT4 precision.
 
 ## Quick Start
 
@@ -29,7 +29,7 @@ Run a dense-layer inference demo against the controller model:
 python examples/dense_layer_demo.py
 ```
 
-The demo uses `STREAM.DOT` to compute quantized dense-layer outputs and compares the result with a pure Python reference. Activation and weight precision can be configured independently; mixed-precision layers are executed at the wider lane precision, which preserves arithmetic while reducing packing density to the wider operand's lane count.
+The demo uses explicit `DOT`/`MAC` row-pair sequencing to compute quantized dense-layer outputs and compares the result with a pure Python reference. Activation and weight precision can be configured independently; mixed-precision layers are promoted to the nearest supported execution precision, which preserves arithmetic while reducing packing density to the execution lane count.
 
 Run cocotb RTL tests when cocotb and a simulator are installed:
 
@@ -56,18 +56,20 @@ Set `TO_STEP` to continue further through the LibreLane classic flow.
 
 Current verification checkpoint:
 
-- Implements `VXOR`, `VAND`, `VOR`, `VADD`, `VSUB`, `DOT`, `MAC`, `SUM`, `POPCNT`, `XNORDOT`, `STREAM.DOT`, `STREAM.MAC`, and `ACC`
-- Adds one pending command slot per channel for commands issued while `PIM busy` is high
-- Restores all four encoded row values per bank
-- Adds `CONFIG` subops to set/read each channel's automatic refresh reload counter and enable/disable automatic refresh
-- `STREAM` uses `imm8[2:0]` as a row-pair count from 1 through 4 and runs lane-serial DOT/MAC over consecutive row pairs
-- Model/example tests: 23 passing
-- Cocotb SPI RTL tests: 11 TinyTapeout-wrapper tests passing
-- Synthesis: 5495 cells, total mapped area 75687.2046
-- Official TinyTapeout area target: `2x2` tiles for the current feature set
-- Local KLayout/Magic DRC: 0 route DRC errors, 0 Magic DRC errors, 0 KLayout DRC errors, and 0 antenna violations under generic fallback SDC
-- Routed standard-cell utilization: 56.1497%
-- Decision: the lane-serial DOT/MAC compromise is locally routed/DRC-clean under the standalone LibreLane/generic-SDC caveat.
+- Implements experimental `ATTEND`, `DOT`, `MAC`, and `ACC`; `VOP` subopcode 1 is reserved on this area-focused branch
+- Commands issued while the shared PIM operation is busy set sticky error and are dropped
+- Preserves two channels and two banks per channel with two rows per bank for the `1x1` target branch
+- Uses explicit host-issued `REF`; `CONFIG` is reserved on this area-focused branch
+- Uses only `uo_out[0]` for SPI MISO; remaining output pins are tied low and status is read over SPI
+- Opcode `0x7` is reserved and sets sticky error
+- Model/example tests: 27 passing
+- Cocotb SPI RTL tests: 12 TinyTapeout-wrapper tests passing
+- Synthesis: 1486 cells, total mapped area 25560.8514, lint-clean on this experimental branch
+- Official TinyTapeout area target: `1x1` tile for the reduced-depth feature set
+- Latest official TinyTapeout `1x1` GDS check: passing on commit `2fc7515`, including precheck, gate-level test, and viewer generation
+- Magic DRC/LVS/antenna: 0 errors after official GDS build; KLayout DRC is disabled in the current TinyTapeout IHP flow
+- Routed standard-cell utilization: 95.581% in the official TinyTapeout GDS build
+- Decision: this attention-focused experiment preserves two channels and two banks per channel, keeps INT1/INT4 DOT/MAC plus accumulator-fed INT4 `ATTEND`, reserves INT2/INT8 compute and the generic `VADD` slot, narrows each channel accumulator to 8 bits, and shares one PU between both channels to reduce area.
 
 ## Documentation
 
