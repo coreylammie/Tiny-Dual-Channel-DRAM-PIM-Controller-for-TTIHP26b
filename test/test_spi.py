@@ -1,4 +1,5 @@
 import os
+import random
 
 import cocotb
 from cocotb.clock import Clock
@@ -6,6 +7,7 @@ from cocotb.handle import Force, Release
 from cocotb.triggers import RisingEdge
 
 from test.model import isa
+from test.model.pim_model import TinyPimModel
 from test.model.spi_driver import SpiDriver
 
 GATE_LEVEL = os.environ.get("GATES") == "yes"
@@ -78,6 +80,24 @@ async def read_acc8(spi, ch):
 async def status_response(spi, ch):
     await spi.transfer32(isa.status(ch).encode())
     return await spi.transfer32(isa.nop().encode())
+
+
+async def force_channel_command(dut, cmd):
+    channel = getattr(user_design(dut), f"ch{cmd.ch}")
+    await RisingEdge(dut.clk)
+    channel.uop_op.value = Force(int(cmd.op))
+    channel.uop_subop.value = Force(cmd.subop)
+    channel.uop_bank_a.value = Force(cmd.bank_a)
+    channel.uop_row_a.value = Force(cmd.row_a)
+    channel.uop_imm8.value = Force(cmd.imm8)
+    channel.cmd_valid.value = Force(1)
+    await RisingEdge(dut.clk)
+    channel.cmd_valid.value = Release()
+    channel.uop_imm8.value = Release()
+    channel.uop_row_a.value = Release()
+    channel.uop_bank_a.value = Release()
+    channel.uop_subop.value = Release()
+    channel.uop_op.value = Release()
 
 
 @cocotb.test()
@@ -218,6 +238,47 @@ async def spi_config_is_reserved(dut):
     assert ((config_rsp >> 16) & 0x80) != 0
 
 
+@cocotb.test(skip=GATE_LEVEL)
+async def spi_refresh_blocks_target_bank_but_not_other_bank(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset(dut)
+    spi = SpiDriver(dut)
+
+    await spi.transfer32(isa.abort(0).encode())
+    await spi.transfer32(isa.act(0, 0, 0).encode())
+    await spi.transfer32(isa.wr(0, 0, 0xAA).encode())
+    await spi.transfer32(isa.act(0, 1, 0).encode())
+    await spi.transfer32(isa.wr(0, 1, 0x33).encode())
+
+    channel = user_design(dut).ch0
+    try:
+        channel.refresh_bank.value = Force(0)
+        channel.refresh_busy_ctr.value = Force(3)
+        channel.refresh_busy.value = Force(1)
+        channel.target_refreshing.value = Force(1)
+        await force_channel_command(dut, isa.rd(0, 0))
+        channel.target_refreshing.value = Force(0)
+        await force_channel_command(dut, isa.wr(0, 1, 0x44))
+    finally:
+        channel.target_refreshing.value = Release()
+        channel.refresh_busy.value = Release()
+        channel.refresh_busy_ctr.value = Release()
+        channel.refresh_bank.value = Release()
+    await wait_core_clocks(dut, 8)
+
+    blocked_rsp = await status_response(spi, 0)
+    await spi.transfer32(isa.rd(0, 1).encode())
+    bank1_rsp = await spi.transfer32(isa.nop().encode())
+    await spi.transfer32(isa.abort(0).encode())
+    clear_rsp = await status_response(spi, 0)
+
+    assert (blocked_rsp >> 24) == 0xA0
+    assert ((blocked_rsp >> 16) & 0x80) != 0
+    assert (bank1_rsp >> 24) == 0xA0
+    assert (bank1_rsp & 0xFF) == 0x44
+    assert ((clear_rsp >> 16) & 0x80) == 0
+
+
 @cocotb.test()
 async def spi_reserved_secondary_pim_ops_and_opcode_7(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
@@ -307,6 +368,176 @@ async def spi_reserved_secondary_pim_ops_and_opcode_7(dut):
     assert ((vop_reserved_one_rsp >> 16) & 0x80) != 0
     assert ((int2_dot_rsp >> 16) & 0x80) != 0
     assert ((int8_dot_rsp >> 16) & 0x80) != 0
+
+
+@cocotb.test()
+async def spi_invalid_rows_and_attend_flags_set_sticky_without_writeback(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset(dut)
+    spi = SpiDriver(dut)
+
+    await spi.transfer32(isa.abort(0).encode())
+    await spi.transfer32(isa.act(0, 0, 2).encode())
+    invalid_row_rsp = await status_response(spi, 0)
+
+    precision = isa.Precision.INT4
+    query_row = pack_lanes([1, 1], precision)
+    key_row = pack_lanes([1, 1], precision)
+    value_row = pack_lanes([2, 1], precision)
+    state_row = pack_lanes([3, 4], precision)
+
+    await spi.transfer32(isa.abort(0).encode())
+    await write_packed_rows(spi, 0, 0, [query_row, 0])
+    await write_packed_rows(spi, 0, 1, [key_row, 0])
+    await spi.transfer32(isa.act(0, 0, 0).encode())
+    await spi.transfer32(isa.act(0, 1, 0).encode())
+    await spi.transfer32(isa.reduce_dot(0, precision, 0, 1).encode())
+    await wait_core_clocks(dut, 8)
+    await write_packed_rows(spi, 0, 0, [value_row, 0])
+    await write_packed_rows(spi, 0, 1, [state_row, 0])
+    await spi.transfer32(isa.act(0, 0, 0).encode())
+    await spi.transfer32(isa.act(0, 1, 0).encode())
+    await spi.transfer32(
+        isa.vop(0, isa.Vop.ATTEND, precision, 0, 1, dest_bank=1).encode()
+    )
+    flag_rsp = await status_response(spi, 0)
+    await spi.transfer32(isa.rd(0, 1).encode())
+    state_rsp = await spi.transfer32(isa.nop().encode())
+
+    assert ((invalid_row_rsp >> 16) & 0x80) != 0
+    assert ((flag_rsp >> 16) & 0x80) != 0
+    assert (state_rsp >> 24) == 0xA0
+    assert (state_rsp & 0xFF) == state_row
+
+
+@cocotb.test(skip=GATE_LEVEL)
+async def spi_other_channel_local_command_can_interleave_while_pu_busy(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset(dut)
+    spi = SpiDriver(dut)
+
+    await spi.transfer32(isa.abort(0).encode())
+    await spi.transfer32(isa.abort(1).encode())
+    await spi.transfer32(isa.act(1, 0, 0).encode())
+    await spi.transfer32(isa.wr(1, 0, 0x11).encode())
+
+    design = user_design(dut)
+    try:
+        design.pu_busy.value = Force(1)
+        design.pu_ch.value = Force(0)
+        await force_channel_command(dut, isa.wr(1, 0, 0x77))
+    finally:
+        design.pu_ch.value = Release()
+        design.pu_busy.value = Release()
+
+    await spi.transfer32(isa.rd(1, 0).encode())
+    ch1_rd_rsp = await spi.transfer32(isa.nop().encode())
+
+    assert (ch1_rd_rsp >> 24) == 0xA1
+    assert (ch1_rd_rsp & 0xFF) == 0x77
+
+
+@cocotb.test()
+async def spi_back_to_back_command_stress_across_major_opcodes(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset(dut)
+    spi = SpiDriver(dut)
+
+    commands = [
+        isa.abort(0),
+        isa.abort(1),
+        isa.act(0, 0, 0),
+        isa.wr(0, 0, 0x12),
+        isa.act(0, 0, 1),
+        isa.wr(0, 0, 0x34),
+        isa.act(1, 1, 0),
+        isa.wr(1, 1, 0x56),
+        isa.act(0, 0, 0),
+        isa.rd(0, 0),
+        isa.act(0, 0, 1),
+        isa.rd(0, 0),
+        isa.rd(1, 1),
+        isa.status(0),
+        isa.status(1),
+        isa.nop(),
+    ]
+    responses = [await spi.transfer32(cmd.encode()) for cmd in commands]
+    responses.append(await spi.transfer32(isa.nop().encode()))
+
+    assert (responses[10] >> 24) == 0xA0
+    assert (responses[10] & 0xFF) == 0x12
+    assert (responses[12] >> 24) == 0xA0
+    assert (responses[12] & 0xFF) == 0x34
+    assert (responses[13] >> 24) == 0xA1
+    assert (responses[13] & 0xFF) == 0x56
+    assert (responses[14] >> 24) == 0xA0
+    assert (responses[15] >> 24) == 0xA1
+
+
+@cocotb.test()
+async def spi_randomized_model_equivalence_for_control_and_memory_ops(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    await reset(dut)
+    spi = SpiDriver(dut)
+    model = TinyPimModel()
+    rng = random.Random(0xC0C0)
+
+    commands = [isa.abort(0), isa.abort(1)]
+    open_rows = [[None, None], [None, None]]
+    last_written = [[0, 0], [0, 0]]
+
+    for _ in range(40):
+        ch = rng.randrange(2)
+        bank = rng.randrange(2)
+        choice = rng.randrange(8)
+        if choice in (0, 1):
+            row = rng.randrange(2)
+            commands.append(isa.act(ch, bank, row))
+            open_rows[ch][bank] = row
+        elif choice in (2, 3):
+            value = rng.randrange(256)
+            commands.append(isa.wr(ch, bank, value))
+            if open_rows[ch][bank] is not None:
+                last_written[ch][bank] = value
+        elif choice == 4:
+            commands.append(isa.rd(ch, bank))
+        elif choice == 5:
+            commands.append(isa.status(ch))
+        elif choice == 6:
+            commands.append(isa.pre(ch, bank))
+            open_rows[ch][bank] = None
+        else:
+            commands.append(isa.nop())
+
+    commands.extend(
+        [
+            isa.abort(0),
+            isa.abort(1),
+            isa.act(0, 0, 0),
+            isa.wr(0, 0, last_written[0][0]),
+            isa.rd(0, 0),
+            isa.status(0),
+        ]
+    )
+
+    expected_next = 0
+    for cmd in commands:
+        actual = await spi.transfer32(cmd.encode())
+        assert actual == expected_next
+        pre_status = [channel.status() for channel in model.channels]
+        result = model.execute(cmd)
+        if result is None:
+            expected_next = (
+                0x55000000 | (pre_status[1] << 16) | (pre_status[0] << 8)
+            )
+        else:
+            expected_next = (
+                (0xA0 | cmd.ch) << 24
+                | (model.channels[cmd.ch].status() << 16)
+                | (result & 0xFF)
+            )
+
+    assert await spi.transfer32(isa.nop().encode()) == expected_next
 
 
 @cocotb.test()
