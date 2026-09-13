@@ -62,13 +62,13 @@ Current verification checkpoint:
 - Uses explicit host-issued `REF`; `CONFIG` is reserved on this area-focused branch
 - Uses only `uo_out[0]` for SPI MISO; remaining output pins are tied low and status is read over SPI
 - Opcode `0x7` is reserved and sets sticky error
-- Model/example tests: 26 passing
-- Cocotb SPI RTL tests: 11 TinyTapeout-wrapper tests passing
-- Synthesis: 1514 cells, total mapped area 25579.1844, lint-clean on this experimental branch
+- Model/example tests: 27 passing
+- Cocotb SPI RTL tests: 12 TinyTapeout-wrapper tests passing
+- Synthesis: 1486 cells, total mapped area 25560.8514, lint-clean on this experimental branch
 - Official TinyTapeout area target: `1x1` tile for the reduced-depth feature set
-- Latest official TinyTapeout `1x1` GDS check: passing, including precheck, gate-level test, and viewer generation
+- Latest official TinyTapeout `1x1` GDS check: passing on commit `2fc7515`, including precheck, gate-level test, and viewer generation
 - Magic DRC/LVS/antenna: 0 errors after official GDS build; KLayout DRC is disabled in the current TinyTapeout IHP flow
-- Routed standard-cell utilization: 95.304% in the official TinyTapeout GDS build
+- Routed standard-cell utilization: 95.581% in the official TinyTapeout GDS build
 - Decision: this attention-focused experiment preserves two channels and two banks per channel, keeps INT1/INT4 DOT/MAC plus accumulator-fed INT4 `ATTEND`, reserves INT2/INT8 compute and the generic `VADD` slot, narrows each channel accumulator to 8 bits, and shares one PU between both channels to reduce area.
 
 ## Documentation

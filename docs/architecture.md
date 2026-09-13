@@ -28,4 +28,4 @@ The implemented PIM operations are experimental `ATTEND`, `DOT`, and `MAC`, plus
 
 ## Physical Status
 
-The current 1x1 branch passes the official TinyTapeout GDS workflow, including precheck, gate-level test, and viewer generation. The routed design reports 95.304% standard-cell utilization with route DRC 0, Magic DRC 0, LVS 0, antenna violations 0, setup violations 0, and hold violations 0.
+The current 1x1 branch passes the official TinyTapeout GDS workflow, including precheck, gate-level test, and viewer generation. The routed design reports 95.581% standard-cell utilization with route DRC 0, Magic DRC 0, LVS 0, antenna violations 0, setup violations 0, hold violations 0, max slew violations 0, and max cap violations 0.
