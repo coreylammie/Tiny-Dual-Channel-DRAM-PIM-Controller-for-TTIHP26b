@@ -64,6 +64,8 @@
 | 2026-09-12 | `RUN_TAG=self-review-abort-guard-synth scripts/synth.sh` | PASS through `Yosys.Synthesis`, lint-clean. Review checkpoint: 1486 cells, 262 sequential cells, area 25560.8514, sequential area 12835.0656. |
 | 2026-09-12 | GitHub Actions `test` run 34680526107 | PASS, Ubuntu cocotb regression on commit `2fc7515`. |
 | 2026-09-12 | GitHub Actions `gds` run 34680526175 | PASS, official TinyTapeout GDS build, precheck, gate-level test, and viewer generation on commit `2fc7515`. Routed utilization 95.581%, final placement area 27662.51 / core area 28941.494, route DRC 0, Magic DRC 0, LVS 0, antenna violations 0, setup violations 0, hold violations 0, max slew violations 0, and max cap violations 0. |
+| 2026-09-13 | GitHub Actions `test` run 34744372656 | PASS, Ubuntu cocotb regression on merge commit `8c64639` on `main`. |
+| 2026-09-13 | GitHub Actions `gds` run 34744372793 | PASS, official TinyTapeout GDS build, precheck, gate-level test, and viewer generation on merge commit `8c64639` on `main`. Routed utilization 95.581%, final placement area 27662.51 / core area 28941.494, route DRC 0, Magic DRC 0, LVS 0, antenna violations 0, setup violations 0, hold violations 0, max slew violations 0, and max cap violations 0. |
 | 2026-09-11 | `/private/tmp/tto-kvupd-venv/bin/python -m pytest test/test_model.py test/test_dense_layer_demo.py` | PASS, 26 tests after reserving INT2 compute and promoting INT2 dense-layer inputs to INT4 execution. |
 | 2026-09-11 | `make -C test` | PASS, 11 TinyTapeout-wrapper cocotb RTL tests after reserving INT2 compute. |
 | 2026-09-11 | GitHub Actions `test` run 34568845296 | PASS, Ubuntu cocotb regression on commit `a4b9709`. |

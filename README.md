@@ -66,7 +66,7 @@ Current verification checkpoint:
 - Cocotb SPI RTL tests: 12 TinyTapeout-wrapper tests passing
 - Synthesis: 1486 cells, total mapped area 25560.8514, lint-clean on this experimental branch
 - Official TinyTapeout area target: `1x1` tile for the reduced-depth feature set
-- Latest official TinyTapeout `1x1` GDS check: passing on commit `2fc7515`, including precheck, gate-level test, and viewer generation
+- Latest official TinyTapeout `1x1` GDS check: passing on merge commit `8c64639`, including precheck, gate-level test, and viewer generation
 - Magic DRC/LVS/antenna: 0 errors after official GDS build; KLayout DRC is disabled in the current TinyTapeout IHP flow
 - Routed standard-cell utilization: 95.581% in the official TinyTapeout GDS build
 - Decision: this attention-focused experiment preserves two channels and two banks per channel, keeps INT1/INT4 DOT/MAC plus accumulator-fed INT4 `ATTEND`, reserves INT2/INT8 compute and the generic `VADD` slot, narrows each channel accumulator to 8 bits, and shares one PU between both channels to reduce area.
